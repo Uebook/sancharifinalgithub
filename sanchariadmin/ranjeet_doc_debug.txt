@@ -1,0 +1,37 @@
+[
+  {
+    "_id": "69d642f2380e343a2e09c3fe",
+    "name": "Super Admin",
+    "role": "admin",
+    "status": "pending",
+    "documents": {}
+  },
+  {
+    "_id": "69f0913abbc64456efb5f5a0",
+    "name": "John Doe",
+    "role": "driver",
+    "status": "approved",
+    "documents": {
+      "aadharFront": "/uploads/profile-69f0913abbc64456efb5f5a0-1777633233717-636649030.jpg",
+      "aadharBack": "/uploads/profile-69f0913abbc64456efb5f5a0-1777633233877-216160232.jpg",
+      "licenseFront": "/uploads/profile-69f0913abbc64456efb5f5a0-1777633234000-742830297.jpg",
+      "licenseBack": "/uploads/profile-69f0913abbc64456efb5f5a0-1777633234107-620064031.jpg",
+      "insurance": "/uploads/profile-69f0913abbc64456efb5f5a0-1777633234247-952358583.jpg",
+      "rc": "/uploads/profile-69f0913abbc64456efb5f5a0-1777633234408-777887066.jpg"
+    }
+  },
+  {
+    "_id": "69f193bdba11fc4b8e8b3d71",
+    "name": "shubham dubey",
+    "role": "passenger",
+    "status": "pending",
+    "documents": {}
+  },
+  {
+    "_id": "69f2147a067f4e2c3f52e299",
+    "name": "John Doe",
+    "role": "passenger",
+    "status": "pending",
+    "documents": {}
+  }
+]

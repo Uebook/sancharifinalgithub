@@ -1,0 +1,48 @@
+# Node dependencies
+node_modules/
+**/node_modules/
+
+# Build folders
+build/
+**/build/
+android/app/build/
+**/android/app/build/
+android/.gradle/
+**/android/.gradle/
+.gradle/
+**/.gradle/
+dist/
+**/dist/
+.output/
+**/public/uploads/
+
+# Vercel & IDE
+.vercel/
+**/.vercel/
+.idea/
+**/.idea/
+*.iml
+.DS_Store
+**/.DS_Store
+
+# iOS
+DerivedData/
+**/DerivedData/
+Pods/
+**/Pods/
+*.ipa
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & Secrets
+.env
+.env.*
+**/.env
+**/.env.*
+*.keystore
+!debug.keystore
+
