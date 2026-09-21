@@ -59,5 +59,13 @@ export const authService = {
     logout: async () => {
         await AsyncStorage.removeItem('userToken');
         await AsyncStorage.removeItem('userInfo');
+    },
+
+    deleteAccount: async () => {
+        const response = await apiClient.delete('/auth/delete-account');
+        await AsyncStorage.removeItem('userToken');
+        await AsyncStorage.removeItem('userInfo');
+        return response.data;
     }
 };
+

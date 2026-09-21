@@ -73,7 +73,7 @@ const EntryScreen = () => {
                                     !isDriver ? styles.toggleOptionTextActive : styles.toggleOptionTextInactive,
                                 ]}
                             >
-                                Passenger
+                                Customer
                             </Text>
                         </TouchableOpacity>
 
@@ -91,7 +91,7 @@ const EntryScreen = () => {
                                     isDriver ? styles.toggleOptionTextActive : styles.toggleOptionTextInactive,
                                 ]}
                             >
-                                Driver
+                                Partner
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -106,7 +106,7 @@ const EntryScreen = () => {
                     onPress={handleContinue}
                 >
                     <Text style={styles.continueButtonText}>
-                        {isDriver ? 'Go to Driver Portal' : 'Start Your Journey'}
+                        {isDriver ? 'Go to Partner Portal' : 'Start Your Journey'}
                     </Text>
                     <View style={styles.arrowCircle}>
                         <FontAwesomeIcon icon={faArrowRight} size={15} color={isDriver ? "#0F766E" : "#00897B"} />

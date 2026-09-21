@@ -134,7 +134,7 @@ const UnifiedLoginScreen = () => {
 
                     <View style={styles.headerRight}>
                         <View style={styles.roleBadge}>
-                            <Text style={styles.roleText}>{isDriver ? 'DRIVER ACCOUNT' : 'PASSENGER ACCOUNT'}</Text>
+                            <Text style={styles.roleText}>{isDriver ? 'PARTNER ACCOUNT' : 'CUSTOMER ACCOUNT'}</Text>
                         </View>
                         <TouchableOpacity
                             style={styles.languageSelector}

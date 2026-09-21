@@ -109,7 +109,7 @@ const PassengerLoginScreen = ({ route }: any) => {
                 </TouchableOpacity>
                 <View style={[styles.badge, isDriver && styles.badgeDriver]}>
                     <Text style={[styles.badgeText, isDriver && styles.badgeTextDriver]}>
-                        {isDriver ? 'DRIVER ACCOUNT' : 'PASSENGER ACCOUNT'}
+                        {isDriver ? 'PARTNER ACCOUNT' : 'CUSTOMER ACCOUNT'}
                     </Text>
                 </View>
             </View>
@@ -126,8 +126,8 @@ const PassengerLoginScreen = ({ route }: any) => {
                         </Text>
                         <Text style={styles.subtitle}>
                             {isDriver
-                                ? 'Sign in or create your driver account.'
-                                : 'Sign in or create your passenger account.'}
+                                ? 'Sign in or create your partner account.'
+                                : 'Sign in or create your customer account.'}
                         </Text>
 
                         {/* Space instead of Tabs */}

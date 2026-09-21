@@ -74,6 +74,7 @@ interface AuthContextType {
     whatsappLogin: (phone: string, role?: string) => Promise<void>;
 
     logout: () => Promise<void>;
+    deleteAccount: () => Promise<any>;
     refetchUser: () => Promise<void>;
     updateUser: (partialData: Partial<User>) => Promise<void>;
 }
@@ -249,6 +250,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const deleteAccount = async () => {
+        setIsLoading(true);
+        try {
+            const res = await authService.deleteAccount();
+
+            const isSignedIn = GoogleSignin.hasPreviousSignIn();
+            if (isSignedIn) {
+                await GoogleSignin.revokeAccess();
+                await GoogleSignin.signOut();
+            }
+            setUser(null);
+            return res;
+        } catch (error) {
+            console.error('Delete account error:', error);
+            throw error;
+        } finally {
+            setUser(null);
+            setIsLoading(false);
+        }
+    };
+
     const refetchUser = async () => {
         try {
             const response = await authService.getMe();
@@ -272,7 +294,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, isLoading, isAppLoading, login, loginWithGoogle, sendOTP, whatsappLogin, register, verifyOTP, logout, refetchUser, updateUser }}>
+        <AuthContext.Provider value={{ user, isLoading, isAppLoading, login, loginWithGoogle, sendOTP, whatsappLogin, register, verifyOTP, logout, deleteAccount, refetchUser, updateUser }}>
             {children}
         </AuthContext.Provider>
     );

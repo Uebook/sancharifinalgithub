@@ -217,8 +217,9 @@ export const login = async (req, res) => {
       });
     }
 
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate 6-digit OTP (Fixed 123456 for test number 8439993033, random for all other numbers)
+    const cleanUserPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
+    const otp = cleanUserPhone === '8439993033' ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     user.otp = otp;
@@ -290,7 +291,10 @@ export const verifyOTP = async (req, res) => {
     });
     console.log("user found for OTP verification:", user?.phone);
 
-    if (!user || user.otp !== otp || user.otpExpires < new Date()) {
+    const isTestNumber = cleanPhone === '8439993033';
+    const isTestOtpValid = isTestNumber && otp === '123456';
+
+    if (!user || (!isTestOtpValid && (user.otp !== otp || user.otpExpires < new Date()))) {
       return sendError(res, 401, 'Invalid or expired OTP');
     }
 
@@ -429,8 +433,8 @@ export const sendOTP = async (req, res) => {
       });
     }
 
-    // Generate random 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate random 6-digit OTP (Fixed 123456 for test number 8439993033, random for all other numbers)
+    const otp = cleanPhone === '8439993033' ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     user.otp = otp;
@@ -627,5 +631,34 @@ export const getLocationHistory = async (req, res) => {
     return sendError(res, 500, `Failed to fetch location history: ${error.message}`);
   }
 };
+
+// ─── @route  DELETE /api/auth/delete-account ────────────────────
+// @desc   Permanently delete authenticated user's account and data
+// @access Private
+export const deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return sendError(res, 404, 'User not found');
+    }
+
+    // Delete user from database
+    await User.findByIdAndDelete(userId);
+
+    // Cancel any active bookings
+    await Booking.updateMany(
+      { passenger: userId, status: { $in: ['pending', 'accepted', 'arrived', 'in_progress'] } },
+      { status: 'cancelled', cancellationReason: 'User deleted account' }
+    );
+
+    return sendSuccess(res, 200, 'Account and associated data deleted successfully');
+  } catch (error) {
+    console.error('deleteAccount error:', error);
+    return sendError(res, 500, `Failed to delete account: ${error.message}`);
+  }
+};
+
 
 

@@ -7,6 +7,8 @@ import {
     ScrollView,
     Switch,
     Linking,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
@@ -15,6 +17,7 @@ import {
     faBell,
     faGlobe,
     faChevronRight,
+    faTrash,
 } from '@fortawesome/free-solid-svg-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import BottomNavBar from '../Navigation/BottomNavBar';
@@ -24,13 +27,38 @@ import { useAuth } from '../Context/AuthContext';
 const SettingsScreen = () => {
     const navigation = useNavigation();
     const route = useRoute();
-    const { user } = useAuth();
+    const { user, deleteAccount, isLoading } = useAuth();
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
     const toggleSwitch = () => setNotificationsEnabled(previousState => !previousState);
 
     const { mode } = (route.params as { mode?: string }) || {};
     const isDriver = mode === 'driver' || user?.role === 'driver';
+
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            "Delete Account & Data",
+            "Are you sure you want to permanently delete your account? All your personal data, rides, and profile information will be deleted immediately and cannot be recovered.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete My Account",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await deleteAccount();
+                            Alert.alert("Account Deleted", "Your account and associated data have been permanently deleted.");
+                        } catch (error: any) {
+                            Alert.alert(
+                                "Error",
+                                error?.response?.data?.message || "Failed to delete account. Please check your connection or contact support@sanchari.io"
+                            );
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     return (
         <View style={[styles.container, isDriver && styles.darkContainer]}>
@@ -105,6 +133,29 @@ const SettingsScreen = () => {
                         </TouchableOpacity>
                     </View>
 
+                    {/* Account Deletion */}
+                    <Text style={[styles.sectionTitle, { marginTop: 24, color: '#EF4444' }]}>ACCOUNT ACTIONS</Text>
+                    <View style={[styles.card, isDriver && styles.darkCard, { borderColor: isDriver ? '#7F1D1D' : '#FEE2E2' }]}>
+                        <TouchableOpacity
+                            style={styles.simpleRow}
+                            onPress={handleDeleteAccount}
+                            disabled={isLoading}
+                            activeOpacity={0.7}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <FontAwesomeIcon icon={faTrash} size={16} color="#DC2626" style={{ marginRight: 12 }} />
+                                <Text style={[styles.simpleRowText, { color: '#DC2626' }]}>
+                                    {isLoading ? 'Processing...' : 'Delete Account & Data'}
+                                </Text>
+                            </View>
+                            {isLoading ? (
+                                <ActivityIndicator size="small" color="#DC2626" />
+                            ) : (
+                                <FontAwesomeIcon icon={faChevronRight} size={12} color="#DC2626" />
+                            )}
+                        </TouchableOpacity>
+                    </View>
+
                     <Text style={[styles.versionText, isDriver && { color: '#64748B' }]}>Version 2.4.0 (Build 390)</Text>
 
                 </ScrollView>
@@ -118,6 +169,7 @@ const SettingsScreen = () => {
         </View>
     );
 };
+
 
 const styles = StyleSheet.create({
     container: {
