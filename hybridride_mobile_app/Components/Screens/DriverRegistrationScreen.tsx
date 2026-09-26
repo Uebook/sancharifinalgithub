@@ -30,6 +30,8 @@ import { useAuth } from '../Context/AuthContext';
 import { authService } from '../../Services/authService';
 import { driverService } from '../../Services/driverService';
 
+import { driverOnboardingStorage } from '../../Services/driverOnboardingStorage';
+
 const { width } = Dimensions.get('window');
 
 const DriverRegistrationScreen = () => {
@@ -47,12 +49,12 @@ const DriverRegistrationScreen = () => {
         capturedDocs?: Record<string, string>
     } || {};
 
-    const vehicleType = params.vehicleType || 'CAR';
+    const [vehicleType, setVehicleType] = useState<string>(params.vehicleType || 'CAR');
     // State to hold merged user data across navigation
     const [mergedUserData, setMergedUserData] = useState(params.userData || {});
 
     const getDocLabel = (baseLabel: string) => {
-        const type = vehicleType.toUpperCase();
+        const type = (vehicleType || 'CAR').toUpperCase();
         if (baseLabel === 'RC') return type === 'BIKE' ? 'Bike RC' : (type === 'AUTO' ? 'Auto RC' : 'Car RC');
         if (baseLabel === 'Insurance') return type === 'BIKE' ? 'Bike Insurance' : (type === 'AUTO' ? 'Auto Insurance' : 'Car Insurance');
         if (baseLabel === 'Permit') return type === 'BIKE' ? 'Bike Permit' : (type === 'AUTO' ? 'Auto Permit' : 'Car Permit');
@@ -65,22 +67,75 @@ const DriverRegistrationScreen = () => {
     const permitLabel = getDocLabel('Permit');
     const fitnessLabel = getDocLabel('Fitness');
 
-    const [uploadedDocuments, setUploadedDocuments] = useState<string[]>([]);
-    const [documentUris, setDocumentUris] = useState<Record<string, string>>({});
+    const [uploadedDocuments, setUploadedDocuments] = useState<string[]>(params.updatedDocList || []);
+    const [documentUris, setDocumentUris] = useState<Record<string, string>>(params.capturedDocs || {});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleBack = React.useCallback(() => {
+    // Load initial draft from persistent storage on mount
+    useEffect(() => {
+        const loadInitialDraft = async () => {
+            const draft = await driverOnboardingStorage.getDraft();
+            if (draft) {
+                if (draft.vehicleType && !params.vehicleType) {
+                    setVehicleType(draft.vehicleType);
+                }
+                if (draft.userData) {
+                    setMergedUserData((prev: any) => ({
+                        ...draft.userData,
+                        ...prev,
+                        ...(params.userData || {})
+                    }));
+                }
+                if (draft.capturedDocs) {
+                    setDocumentUris((prev: any) => ({
+                        ...draft.capturedDocs,
+                        ...prev,
+                        ...(params.capturedDocs || {})
+                    }));
+                }
+                if (draft.uploadedDocuments) {
+                    setUploadedDocuments((prev: any) => {
+                        const merged = Array.from(new Set([
+                            ...draft.uploadedDocuments!,
+                            ...prev,
+                            ...(params.updatedDocList || []),
+                            ...(params.completedDocument ? [params.completedDocument] : [])
+                        ]));
+                        return merged;
+                    });
+                }
+            }
+        };
+        loadInitialDraft();
+    }, []);
+
+    const handleBack = React.useCallback(async () => {
+        await driverOnboardingStorage.saveDraft({
+            userData: mergedUserData,
+            capturedDocs: documentUris,
+            uploadedDocuments,
+            vehicleType
+        });
+
         if (isReupload) {
             (navigation as any).navigate('DriverPendingApproval');
         } else {
-            (navigation as any).navigate('DriverVehicleSelection', { userData: mergedUserData });
+            (navigation as any).navigate('DriverVehicleSelection', {
+                userData: mergedUserData,
+                vehicleType,
+                capturedDocs: documentUris,
+                updatedDocList: uploadedDocuments
+            });
         }
         return true;
-    }, [navigation, mergedUserData, isReupload]);
+    }, [navigation, mergedUserData, documentUris, uploadedDocuments, vehicleType, isReupload]);
 
     useFocusEffect(
         React.useCallback(() => {
-            const onBackPress = () => handleBack();
+            const onBackPress = () => {
+                handleBack();
+                return true;
+            };
             const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
             return () => subscription.remove();
         }, [handleBack])
@@ -90,47 +145,89 @@ const DriverRegistrationScreen = () => {
     const isLoading = authLoading || isSubmitting;
 
     useEffect(() => {
-        console.log("DEBUG: DriverRegistration Params Update:");
-        console.log(" - userData:", JSON.stringify(params.userData, null, 2));
-        console.log(" - capturedDocs:", JSON.stringify(params.capturedDocs, null, 2));
-        console.log(" - updatedDocList:", params.updatedDocList);
+        if (params.vehicleType) {
+            setVehicleType(params.vehicleType);
+        }
+
+        let updatedData = { ...mergedUserData };
+        let updatedDocs = { ...documentUris };
+        let updatedList = [...uploadedDocuments];
 
         // Merge userData if present
         if (params.userData) {
-            console.log("DEBUG: Updating mergedUserData with:", JSON.stringify(params.userData, null, 2));
-            setMergedUserData((prev: any) => ({
-                ...prev,
+            updatedData = {
+                ...updatedData,
                 ...params.userData
-            }));
+            };
+            setMergedUserData(updatedData);
         }
 
         // Handle captured documents from Upload Screen
         if (params.capturedDocs) {
-            setDocumentUris((prev: any) => ({
-                ...prev,
+            updatedDocs = {
+                ...updatedDocs,
                 ...params.capturedDocs
-            }));
+            };
+            setDocumentUris(updatedDocs);
         }
 
         // Handle visual state of "Uploaded" keys
         if (params.updatedDocList) {
-            setUploadedDocuments(params.updatedDocList);
+            updatedList = Array.from(new Set([...updatedList, ...params.updatedDocList]));
+            setUploadedDocuments(updatedList);
         } else if (params.completedDocument) {
-            setUploadedDocuments((prev: any) => {
-                if (!prev.includes(params.completedDocument!)) {
-                    return [...prev, params.completedDocument!];
-                }
-                return prev;
-            });
+            if (!updatedList.includes(params.completedDocument)) {
+                updatedList = [...updatedList, params.completedDocument];
+                setUploadedDocuments(updatedList);
+            }
         }
-    }, [params.completedDocument, params.updatedDocList, params.capturedDocs, params.userData]);
 
-    const isIdentityVerified = uploadedDocuments.includes('Aadhaar Card');
+        // Auto-save any incoming updates into storage
+        driverOnboardingStorage.saveDraft({
+            userData: updatedData,
+            capturedDocs: updatedDocs,
+            uploadedDocuments: updatedList,
+            vehicleType: params.vehicleType || vehicleType
+        });
+    }, [params.completedDocument, params.updatedDocList, params.capturedDocs, params.userData, params.vehicleType]);
+
+    const checkIsCompleted = (title: string) => {
+        if (uploadedDocuments.includes(title)) return true;
+        if (title === 'Aadhaar Card') return !!(documentUris.aadharFront && documentUris.aadharBack);
+        if (title === 'PAN Card') return !!documentUris.panCard;
+        if (title === 'Driving License') return !!(documentUris.licenseFront && documentUris.licenseBack);
+        if (title.includes('RC')) return !!documentUris.rc;
+        if (title.includes('Insurance')) return !!documentUris.insurance;
+        if (title.includes('Permit')) return !!documentUris.permit;
+        if (title.includes('Fitness')) return !!documentUris.fitness;
+        if (title === 'Vehicle Details') return !!(mergedUserData?.vehicle?.make && mergedUserData?.vehicle?.plateNumber);
+        return false;
+    };
+
+    const hasRC =
+        uploadedDocuments.includes(rcLabel) ||
+        uploadedDocuments.includes('RC') ||
+        uploadedDocuments.includes('Bike RC') ||
+        uploadedDocuments.includes('Car RC') ||
+        uploadedDocuments.includes('Auto RC') ||
+        uploadedDocuments.includes('Traveler RC') ||
+        !!documentUris.rc;
+
+    const hasInsurance =
+        uploadedDocuments.includes(insuranceLabel) ||
+        uploadedDocuments.includes('Insurance') ||
+        uploadedDocuments.includes('Bike Insurance') ||
+        uploadedDocuments.includes('Car Insurance') ||
+        uploadedDocuments.includes('Auto Insurance') ||
+        uploadedDocuments.includes('Traveler Insurance') ||
+        !!documentUris.insurance;
+
+    const isIdentityVerified = checkIsCompleted('Aadhaar Card');
     const isMandatoryComplete = isIdentityVerified &&
-        uploadedDocuments.includes('Driving License') &&
-        uploadedDocuments.includes(getDocLabel('RC')) &&
-        uploadedDocuments.includes(getDocLabel('Insurance')) &&
-        uploadedDocuments.includes('Vehicle Details');
+        checkIsCompleted('Driving License') &&
+        hasRC &&
+        hasInsurance &&
+        checkIsCompleted('Vehicle Details');
 
     const handleRegistration = async () => {
         // Relax check: Google users might not have a password yet if we didn't force one in ProfileSetup
@@ -175,14 +272,11 @@ const DriverRegistrationScreen = () => {
                 // Optionally update vehicle details if they were changed
                 if (mergedUserData.vehicle) {
                     console.log("Updating vehicle details for existing driver...");
-                    // This part depends on if we have a direct vehicle update API, 
-                    // but usually, doc upload handles it or we can add an updateMe call.
                 }
             }
 
             console.log("Starting uploads...");
 
-            // 2. Upload Profile Image and Documents
             // 2. Upload Profile Image (if exists)
             if (mergedUserData.profileImage && !mergedUserData.profileImage.startsWith('http')) {
                 console.log("Uploading profile image...");
@@ -228,11 +322,12 @@ const DriverRegistrationScreen = () => {
             // If it's a re-upload, we might need to tell the backend to reset status to pending
             if (isExistingUser) {
                 console.log("Re-upload complete. Status will be checked by admin.");
-                // We've uploaded new docs, the admin will see them in the panel.
-                // We could call an endpoint to explicitly set status back to 'pending' if the backend doesn't do it automatically on upload.
             }
 
             console.log("All documents uploaded.");
+
+            // Clear draft upon successful account creation / submission
+            await driverOnboardingStorage.clearDraft();
 
             // 3. Update Auth Context to trigger navigation
             setIsSubmitting(false);
@@ -267,12 +362,12 @@ const DriverRegistrationScreen = () => {
     };
 
     const renderStep = (title: string, subtitle: string, icon: any, isLocked: boolean = false, isOptional: boolean = false, onPress?: () => void) => {
-        const isCompleted = uploadedDocuments.includes(title);
+        const isCompleted = checkIsCompleted(title);
 
         return (
             <TouchableOpacity
                 style={[styles.stepCard, isLocked && styles.stepCardLocked, isCompleted && styles.stepCardCompleted]}
-                disabled={isLocked || isCompleted}
+                disabled={isLocked}
                 onPress={onPress}
             >
                 <View style={[styles.iconBox, isLocked ? styles.iconBoxLocked : (isCompleted ? styles.iconBoxCompleted : styles.iconBoxActive)]}>

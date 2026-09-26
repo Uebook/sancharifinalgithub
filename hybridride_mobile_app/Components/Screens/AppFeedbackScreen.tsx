@@ -200,7 +200,7 @@ const AppFeedbackScreen = () => {
                     <View style={styles.infoBox}>
                         <View style={styles.infoRow}>
                             <FontAwesomeIcon icon={faUser} size={12} color="#64748B" style={{ marginRight: 8 }} />
-                            <Text style={styles.infoText}>Submitting as: <Text style={{ color: '#E2E8F0', fontWeight: '700' }}>{user?.name || 'Passenger'}</Text> ({user?.phone || user?.email || 'Registered User'})</Text>
+                            <Text style={styles.infoText}>Submitting as: <Text style={{ color: '#E2E8F0', fontWeight: '700' }}>{user?.name || (user?.role === 'driver' ? 'Partner' : 'Customer')}</Text> ({user?.phone || user?.email || 'Registered User'})</Text>
                         </View>
                         <View style={[styles.infoRow, { marginTop: 4 }]}>
                             <FontAwesomeIcon icon={faMobileScreen} size={12} color="#64748B" style={{ marginRight: 8 }} />

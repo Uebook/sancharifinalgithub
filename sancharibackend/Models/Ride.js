@@ -165,10 +165,12 @@ const rideSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const Ride = mongoose.model("Ride", rideSchema);
-
 // Add geo-spatial indexes for origin and destination
 rideSchema.index({ "origin.location": "2dsphere" });
 rideSchema.index({ "destination.location": "2dsphere" });
+rideSchema.index({ host: 1, status: 1 });
+rideSchema.index({ "passengers.user": 1, status: 1 });
+
+const Ride = mongoose.model("Ride", rideSchema);
 
 export default Ride;

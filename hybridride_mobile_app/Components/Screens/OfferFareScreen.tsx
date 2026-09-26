@@ -24,9 +24,9 @@ const OfferFareScreen = () => {
     // Receive ride details from previous screen (TripDetails / RideSelection)
     const params = (route.params as any) || {};
     const pickupAddress = params.pickupAddress || 'Current Location';
-    const pickupCoords = params.pickupCoords || [77.2090, 28.6139]; // Default Delhi
+    const pickupCoords = params.pickupCoords || null;
     const dropoffAddress = params.dropoffAddress || 'Destination';
-    const dropoffCoords = params.dropoffCoords || [77.1025, 28.5562];
+    const dropoffCoords = params.dropoffCoords || null;
     const vehicleType = params.vehicleType || 'CAR';
     const rideType = params.rideType || 'city';
     const distanceKm = params.distanceKm || 10;

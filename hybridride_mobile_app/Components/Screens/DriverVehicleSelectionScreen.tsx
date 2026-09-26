@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -21,28 +20,57 @@ import {
     faLightbulb,
     faArrowRight
 } from '@fortawesome/free-solid-svg-icons';
+import { driverOnboardingStorage } from '../../Services/driverOnboardingStorage';
 
 const { width } = Dimensions.get('window');
 
 const DriverVehicleSelectionScreen = ({ route }: any) => {
     const navigation = useNavigation();
-    const { userData } = route.params || {}; // Receive userData from ProfileSetup
+    const { userData, capturedDocs, updatedDocList, vehicleType: passedVehicleType } = route.params || {};
 
-    console.log('DriverVehicleSelection - userData:', userData ? 'Present' : 'Missing', userData);
+    const [selectedVehicle, setSelectedVehicle] = useState<string | null>(
+        passedVehicleType || userData?.vehicle?.type || null
+    );
 
-    const [selectedVehicle, setSelectedVehicle] = useState<string | null>(userData?.vehicle?.type || null);
+    useEffect(() => {
+        const loadInitialDraft = async () => {
+            const draft = await driverOnboardingStorage.getDraft();
+            if (draft) {
+                if (!selectedVehicle && draft.vehicleType) {
+                    setSelectedVehicle(draft.vehicleType);
+                }
+            }
+        };
+        loadInitialDraft();
+    }, []);
 
-    const handleBack = React.useCallback(() => {
+    const handleBack = React.useCallback(async () => {
+        await driverOnboardingStorage.saveDraft({
+            vehicleType: selectedVehicle || undefined,
+            userData: {
+                ...userData,
+                vehicle: {
+                    ...userData?.vehicle,
+                    type: selectedVehicle || userData?.vehicle?.type || 'CAR'
+                }
+            },
+            capturedDocs,
+            uploadedDocuments: updatedDocList
+        });
+
         (navigation as any).navigate('ProfileSetup', {
             userType: 'DRIVER',
             userData: userData
         });
         return true;
-    }, [navigation, userData]);
+    }, [navigation, userData, selectedVehicle, capturedDocs, updatedDocList]);
 
     useFocusEffect(
         React.useCallback(() => {
-            const onBackPress = () => handleBack();
+            const onBackPress = () => {
+                handleBack();
+                return true;
+            };
             const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
             return () => subscription.remove();
         }, [handleBack])
@@ -54,6 +82,46 @@ const DriverVehicleSelectionScreen = ({ route }: any) => {
         { id: 'AUTO', name: 'Auto', subtext: 'RICKSHAW, TUK-TUK', icon: faTaxi, color: '#EAB308' }, // Yellow auto (taxi icon)
         { id: 'TRAVELER', name: 'Traveler', subtext: 'MINI BUS, TOOFAN,\nTEMPO', icon: faVanShuttle, color: '#3B82F6' }, // Blue van
     ];
+
+    const handleSelectVehicle = async (id: string) => {
+        setSelectedVehicle(id);
+        await driverOnboardingStorage.saveDraft({
+            vehicleType: id,
+            userData: {
+                ...userData,
+                vehicle: {
+                    ...userData?.vehicle,
+                    type: id
+                }
+            }
+        });
+    };
+
+    const handleContinue = async () => {
+        if (!selectedVehicle) return;
+
+        const updatedUserData = {
+            ...userData,
+            vehicle: {
+                ...userData?.vehicle,
+                type: selectedVehicle
+            }
+        };
+
+        await driverOnboardingStorage.saveDraft({
+            vehicleType: selectedVehicle,
+            userData: updatedUserData,
+            capturedDocs,
+            uploadedDocuments: updatedDocList
+        });
+
+        (navigation as any).navigate('DriverRegistration', {
+            vehicleType: selectedVehicle,
+            userData: updatedUserData,
+            capturedDocs,
+            updatedDocList
+        });
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -79,7 +147,7 @@ const DriverVehicleSelectionScreen = ({ route }: any) => {
                                 styles.card,
                                 selectedVehicle === vehicle.id && styles.selectedCard
                             ]}
-                            onPress={() => setSelectedVehicle(vehicle.id)}
+                            onPress={() => handleSelectVehicle(vehicle.id)}
                         >
                             <View style={styles.iconContainer}>
                                 <FontAwesomeIcon
@@ -111,12 +179,7 @@ const DriverVehicleSelectionScreen = ({ route }: any) => {
                         !selectedVehicle && styles.disabledButton
                     ]}
                     disabled={!selectedVehicle}
-                    onPress={() => {
-                        (navigation as any).navigate('DriverRegistration', {
-                            vehicleType: selectedVehicle,
-                            userData: userData // Pass userData forward to Registration
-                        });
-                    }}
+                    onPress={handleContinue}
                 >
                     <Text style={[
                         styles.continueButtonText,

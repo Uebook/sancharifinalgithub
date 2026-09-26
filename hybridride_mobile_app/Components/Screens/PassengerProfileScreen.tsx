@@ -1221,7 +1221,7 @@ const PassengerProfileScreen = () => {
                                 <FontAwesomeIcon icon={faCamera} size={12} color="#FFFFFF" />
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.userName}>{user?.name || 'Passenger'}</Text>
+                        <Text style={styles.userName}>{user?.name || 'Customer'}</Text>
                         <Text style={styles.userPhone}>{user?.phone || ''}</Text>
 
                         {/* Edit Profile Action Pill */}

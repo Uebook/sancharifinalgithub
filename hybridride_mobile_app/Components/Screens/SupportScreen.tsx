@@ -157,7 +157,7 @@ const SupportScreen = () => {
                     <View style={[styles.menuCard, isDriver && styles.darkCard]}>
                         <TouchableOpacity
                             style={styles.menuItem}
-                            onPress={() => Linking.openURL('https://www.sanchari.io/?view=customer-terms')}
+                            onPress={() => Linking.openURL(isDriver ? 'https://sanchari.io/?view=partner-terms' : 'https://www.sanchari.io/?view=customer-terms')}
                             activeOpacity={0.7}
                         >
                             <View style={styles.menuIconBox}>

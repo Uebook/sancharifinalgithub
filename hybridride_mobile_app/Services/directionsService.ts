@@ -1,5 +1,6 @@
 import { PermissionsAndroid, Platform, Alert } from 'react-native';
 import GetLocation from 'react-native-get-location';
+import { promptForEnableLocationIfNeeded } from 'react-native-android-location-enabler';
 import { GOOGLE_MAPS_API_KEY } from '../Config/maps';
 
 export interface RouteOption {
@@ -16,17 +17,22 @@ export interface RouteOption {
 export const getCurrentLocationAddress = async (): Promise<{ address: string; latitude: number; longitude: number } | null> => {
     try {
         if (Platform.OS === 'android') {
-            const granted = await PermissionsAndroid.request(
+            const granted = await PermissionsAndroid.requestMultiple([
                 PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-                {
-                    title: "Location Permission",
-                    message: "Sanchari needs access to your location to set current location.",
-                    buttonPositive: "OK"
-                }
-            );
-            if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-                Alert.alert("Permission Denied", "Location permission is required to detect current location.");
+                PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION
+            ]);
+            const fineGranted = granted[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] === PermissionsAndroid.RESULTS.GRANTED;
+            const coarseGranted = granted[PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION] === PermissionsAndroid.RESULTS.GRANTED;
+
+            if (!fineGranted && !coarseGranted) {
+                Alert.alert("Permission Denied", "Location permission is required to detect your location.");
                 return null;
+            }
+
+            try {
+                await promptForEnableLocationIfNeeded({ interval: 10000 });
+            } catch (err) {
+                // User may have dismissed or already enabled
             }
         }
 
@@ -34,26 +40,34 @@ export const getCurrentLocationAddress = async (): Promise<{ address: string; la
         try {
             location = await GetLocation.getCurrentPosition({
                 enableHighAccuracy: true,
-                timeout: 8000,
+                timeout: 10000,
             });
         } catch {
             location = await GetLocation.getCurrentPosition({
                 enableHighAccuracy: false,
-                timeout: 10000,
+                timeout: 15000,
             });
+        }
+
+        if (!location || typeof location.latitude !== 'number' || typeof location.longitude !== 'number') {
+            return null;
         }
 
         const { latitude, longitude } = location;
         const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
 
-        if (data.status === 'OK' && data.results && data.results.length > 0) {
-            const address = data.results[0].formatted_address;
-            return { address, latitude, longitude };
+            if (data.status === 'OK' && data.results && data.results.length > 0) {
+                const address = data.results[0].formatted_address;
+                return { address, latitude, longitude };
+            }
+        } catch (e) {
+            console.error('Google Reverse Geocoding error:', e);
         }
 
-        // Fallback 1: Free reverse geocoding via OpenStreetMap Nominatim
+        // Fallback: Free reverse geocoding via OpenStreetMap Nominatim
         try {
             const osmUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
             const osmRes = await fetch(osmUrl, {
@@ -79,12 +93,7 @@ export const getCurrentLocationAddress = async (): Promise<{ address: string; la
         return { address: "Current Location", latitude, longitude };
     } catch (err: any) {
         console.error('getCurrentLocationAddress Error:', err);
-        // Clean fallback coordinates if GPS hardware disabled
-        return {
-            address: "Current Location",
-            latitude: 17.4486,
-            longitude: 78.3808
-        };
+        return null;
     }
 };
 
@@ -119,7 +128,8 @@ export const calculateTotalPathDistance = (points: { latitude: number; longitude
 };
 
 // Geocode address text to LatLng using Google Geocoding API
-export const getCoordsFromAddress = async (address: string): Promise<{ latitude: number; longitude: number }> => {
+export const getCoordsFromAddress = async (address: string): Promise<{ latitude: number; longitude: number } | null> => {
+    if (!address || !address.trim()) return null;
     try {
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`;
         const res = await fetch(url);
@@ -131,13 +141,7 @@ export const getCoordsFromAddress = async (address: string): Promise<{ latitude:
     } catch (e) {
         console.error('Geocoding error:', e);
     }
-    // Fallbacks for common Hyderabad locations if offline
-    if (address.toLowerCase().includes('madhapur')) return { latitude: 17.4486, longitude: 78.3808 };
-    if (address.toLowerCase().includes('gachibowli')) return { latitude: 17.4401, longitude: 78.3489 };
-    if (address.toLowerCase().includes('kondapur')) return { latitude: 17.4600, longitude: 78.3650 };
-    if (address.toLowerCase().includes('hitec')) return { latitude: 17.4475, longitude: 78.3760 };
-
-    return { latitude: 17.4486, longitude: 78.3808 };
+    return null;
 };
 
 // Function to decode Google Maps Encoded Polyline String into LatLng array

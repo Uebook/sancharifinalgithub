@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { GOOGLE_MAPS_API_KEY } from '../../Config/maps';
-import { fetchGoogleRoutes, getCoordsFromAddress } from '../../Services/directionsService';
+import { fetchGoogleRoutes, getCoordsFromAddress, getCurrentLocationAddress } from '../../Services/directionsService';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
     faArrowLeft,
@@ -91,7 +91,10 @@ const RideSelectionScreen = () => {
                     orig = await getCoordsFromAddress(pickupAddress);
                 }
                 if (!orig) {
-                    orig = { latitude: 17.4486, longitude: 78.3808 }; // Hyderabad fallback
+                    const curr = await getCurrentLocationAddress();
+                    if (curr) {
+                        orig = { latitude: curr.latitude, longitude: curr.longitude };
+                    }
                 }
 
                 // 2. Resolve Destination
@@ -105,29 +108,28 @@ const RideSelectionScreen = () => {
                 if (!dest && dropoffAddress) {
                     dest = await getCoordsFromAddress(dropoffAddress);
                 }
-                if (!dest) {
-                    dest = { latitude: 17.4401, longitude: 78.3489 }; // Gachibowli fallback
-                }
 
                 if (!isMounted) return;
-                setOriginCoords(orig);
-                setDestinationCoords(dest);
+                if (orig) setOriginCoords(orig);
+                if (dest) setDestinationCoords(dest);
 
-                // 3. Fetch Google Routes (includes automatic math fallback if quota/key denied)
-                const routes = await fetchGoogleRoutes(orig, dest, 'driving');
-                if (routes && routes.length > 0 && isMounted) {
-                    const primaryRoute = routes[0];
-                    setRouteCoordinates(primaryRoute.coordinates);
-                    setCalculatedDistance(primaryRoute.distanceKm);
-                    setCalculatedEta(primaryRoute.durationMin);
+                // 3. Fetch Google Routes if both coordinates exist
+                if (orig && dest) {
+                    const routes = await fetchGoogleRoutes(orig, dest, 'driving');
+                    if (routes && routes.length > 0 && isMounted) {
+                        const primaryRoute = routes[0];
+                        setRouteCoordinates(primaryRoute.coordinates);
+                        setCalculatedDistance(primaryRoute.distanceKm);
+                        setCalculatedEta(primaryRoute.durationMin);
 
-                    if (mapRef.current && primaryRoute.coordinates && primaryRoute.coordinates.length > 0) {
-                        setTimeout(() => {
-                            mapRef.current?.fitToCoordinates(primaryRoute.coordinates, {
-                                edgePadding: { top: 90, right: 60, bottom: 350, left: 60 },
-                                animated: true,
-                            });
-                        }, 400);
+                        if (mapRef.current && primaryRoute.coordinates && primaryRoute.coordinates.length > 0) {
+                            setTimeout(() => {
+                                mapRef.current?.fitToCoordinates(primaryRoute.coordinates, {
+                                    edgePadding: { top: 90, right: 60, bottom: 350, left: 60 },
+                                    animated: true,
+                                });
+                            }, 400);
+                        }
                     }
                 }
             } catch (err) {
@@ -329,14 +331,15 @@ const RideSelectionScreen = () => {
                 scrollEnabled={true}
                 zoomTapEnabled={true}
                 showsCompass={true}
+                showsUserLocation={true}
                 minZoomLevel={3}
                 maxZoomLevel={20}
-                initialRegion={{
-                    latitude: originCoords?.latitude || (pickupCoords ? pickupCoords[1] : 17.4486),
-                    longitude: originCoords?.longitude || (pickupCoords ? pickupCoords[0] : 78.3808),
+                initialRegion={originCoords ? {
+                    latitude: originCoords.latitude,
+                    longitude: originCoords.longitude,
                     latitudeDelta: 0.0922,
                     longitudeDelta: 0.0421,
-                }}
+                } : undefined}
             >
                 {originCoords && (
                     <Marker

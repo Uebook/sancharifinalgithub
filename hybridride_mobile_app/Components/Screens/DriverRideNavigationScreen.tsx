@@ -27,6 +27,7 @@ import MapViewDirections from 'react-native-maps-directions';
 import { CONFIG } from '../../Constants/Config';
 
 import { GOOGLE_MAPS_API_KEY } from '../../Config/maps';
+import { getCurrentLocationAddress } from '../../Services/directionsService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -54,18 +55,41 @@ const DriverRideNavigationScreen = () => {
     const mapRef = useRef<MapView>(null);
 
     // Dynamic Coordinates
-    // If the coordinates from params are [0,0], it means they are obfuscated by the backend
-    const driverCoords = params.driverCoords || { latitude: 28.6139, longitude: 77.2090 };
-    const pickupCoords = params.pickupCoords || { latitude: 28.5355, longitude: 77.3910 };
+    const [driverLocation, setDriverLocation] = useState<{ latitude: number; longitude: number } | null>(
+        params.driverCoords ? {
+            latitude: Number(params.driverCoords.latitude ?? params.driverCoords[1]),
+            longitude: Number(params.driverCoords.longitude ?? params.driverCoords[0]),
+        } : null
+    );
+
+    const [pickupLocation, setPickupLocation] = useState<{ latitude: number; longitude: number } | null>(
+        params.pickupCoords ? {
+            latitude: Number(params.pickupCoords.latitude ?? params.pickupCoords[1]),
+            longitude: Number(params.pickupCoords.longitude ?? params.pickupCoords[0]),
+        } : null
+    );
+
+    useEffect(() => {
+        if (!driverLocation) {
+            getCurrentLocationAddress().then(res => {
+                if (res) {
+                    setDriverLocation({ latitude: res.latitude, longitude: res.longitude });
+                }
+            });
+        }
+    }, []);
 
     // Obfuscated check state
     const [realDropoff, setRealDropoff] = useState<any>(null);
-    const rawDropoff = params.dropoffCoords || { latitude: 28.4595, longitude: 77.0266 };
-    const isDropoffObfuscated = rawDropoff.latitude === 0 && rawDropoff.longitude === 0;
+    const rawDropoff = params.dropoffCoords ? {
+        latitude: Number(params.dropoffCoords.latitude ?? params.dropoffCoords[1]),
+        longitude: Number(params.dropoffCoords.longitude ?? params.dropoffCoords[0]),
+    } : null;
+    const isDropoffObfuscated = rawDropoff && rawDropoff.latitude === 0 && rawDropoff.longitude === 0;
     const dropoffCoords = realDropoff || (isDropoffObfuscated ? null : rawDropoff);
 
     // Use null for destination if not yet arrived to avoid drawing a line to nowhere
-    const currentDestination = viewState === 'DROP_OFF' && dropoffCoords ? dropoffCoords : pickupCoords;
+    const currentDestination = viewState === 'DROP_OFF' && dropoffCoords ? dropoffCoords : pickupLocation;
 
     const handleArrived = async () => {
         try {
@@ -351,19 +375,20 @@ const DriverRideNavigationScreen = () => {
                 <MapView
                     ref={mapRef}
                     style={StyleSheet.absoluteFillObject}
-                    initialRegion={{
-                        ...driverCoords,
+                    showsUserLocation={true}
+                    initialRegion={driverLocation ? {
+                        ...driverLocation,
                         latitudeDelta: 0.1,
                         longitudeDelta: 0.1,
-                    }}
+                    } : undefined}
                     zoomEnabled={true}
                     scrollEnabled={true}
                     pitchEnabled={true}
                     rotateEnabled={true}
                 >
-                    {currentDestination && (
+                    {driverLocation && currentDestination && (
                         <MapViewDirections
-                            origin={driverCoords}
+                            origin={driverLocation}
                             destination={currentDestination}
                             apikey={GOOGLE_MAPS_API_KEY}
                             strokeWidth={6}
@@ -383,15 +408,19 @@ const DriverRideNavigationScreen = () => {
                             }}
                         />
                     )}
-                    <Marker coordinate={driverCoords} title="Driver Location">
-                        <View style={styles.carMarker}>
-                            <View style={styles.carTop} />
-                        </View>
-                    </Marker>
-                    <Marker
-                        coordinate={pickupCoords}
-                        title={"Pickup Location"}
-                    />
+                    {driverLocation && (
+                        <Marker coordinate={driverLocation} title="Driver Location">
+                            <View style={styles.carMarker}>
+                                <View style={styles.carTop} />
+                            </View>
+                        </Marker>
+                    )}
+                    {pickupLocation && (
+                        <Marker
+                            coordinate={pickupLocation}
+                            title={"Pickup Location"}
+                        />
+                    )}
                     {dropoffCoords && viewState === 'DROP_OFF' && (
                         <Marker
                             coordinate={dropoffCoords}

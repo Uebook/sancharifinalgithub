@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -7,11 +7,13 @@ import {
     TouchableOpacity,
     Alert,
     ScrollView,
+    BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { driverOnboardingStorage } from '../../Services/driverOnboardingStorage';
 
 const DriverVehicleDetailsScreen = () => {
     const navigation = useNavigation();
@@ -20,16 +22,36 @@ const DriverVehicleDetailsScreen = () => {
     const isReupload = route.name === 'ReuploadVehicleDetails';
     const targetScreen = isReupload ? 'ReuploadRegistration' : 'DriverRegistration';
 
-    const [make, setMake] = useState('');
-    const [model, setModel] = useState('');
-    const [year, setYear] = useState('');
-    const [plateNumber, setPlateNumber] = useState('');
-    const [color, setColor] = useState('');
-    const [fuelType, setFuelType] = useState('Petrol');
-    const [seatingCapacity, setSeatingCapacity] = useState(4);
-    const [bootSpace, setBootSpace] = useState('');
+    const [make, setMake] = useState(userData?.vehicle?.make || '');
+    const [model, setModel] = useState(userData?.vehicle?.model || '');
+    const [year, setYear] = useState(userData?.vehicle?.year || '');
+    const [plateNumber, setPlateNumber] = useState(userData?.vehicle?.plateNumber || '');
+    const [color, setColor] = useState(userData?.vehicle?.color || '');
+    const [fuelType, setFuelType] = useState(userData?.vehicle?.fuelType || 'Petrol');
+    const [seatingCapacity, setSeatingCapacity] = useState(
+        userData?.vehicle?.seatingCapacity || (vehicleType === 'BIKE' ? 1 : 4)
+    );
+    const [bootSpace, setBootSpace] = useState(userData?.vehicle?.bootSpace || '');
 
-    const handleBack = () => {
+    useEffect(() => {
+        const loadInitialDraft = async () => {
+            const draft = await driverOnboardingStorage.getDraft();
+            if (draft?.userData?.vehicle) {
+                const v = draft.userData.vehicle;
+                if (!make && v.make) setMake(v.make);
+                if (!model && v.model) setModel(v.model);
+                if (!year && v.year) setYear(v.year);
+                if (!plateNumber && v.plateNumber) setPlateNumber(v.plateNumber);
+                if (!color && v.color) setColor(v.color);
+                if (v.fuelType) setFuelType(v.fuelType);
+                if (v.seatingCapacity) setSeatingCapacity(v.seatingCapacity);
+                if (!bootSpace && v.bootSpace) setBootSpace(v.bootSpace);
+            }
+        };
+        loadInitialDraft();
+    }, []);
+
+    const handleBack = React.useCallback(async () => {
         const vehicleDetails = {
             make,
             model,
@@ -38,8 +60,8 @@ const DriverVehicleDetailsScreen = () => {
             color,
             type: vehicleType,
             fuelType,
-            seatingCapacity: Number(seatingCapacity),
-            bootSpace
+            seatingCapacity: vehicleType === 'BIKE' ? 1 : Number(seatingCapacity),
+            bootSpace: vehicleType === 'BIKE' ? '0' : bootSpace
         };
 
         const updatedUserData = {
@@ -47,21 +69,44 @@ const DriverVehicleDetailsScreen = () => {
             vehicle: vehicleDetails
         };
 
+        let currentDocs = [...existingDocs];
+        const isComplete = !!(make && model && year && plateNumber && color);
+        if (isComplete && !currentDocs.includes('Vehicle Details')) {
+            currentDocs.push('Vehicle Details');
+        }
+
+        await driverOnboardingStorage.saveDraft({
+            userData: updatedUserData,
+            vehicleType,
+            capturedDocs,
+            uploadedDocuments: currentDocs
+        });
+
         (navigation as any).navigate(targetScreen, {
             userData: updatedUserData,
             vehicleType,
-            capturedDocs
+            capturedDocs,
+            updatedDocList: currentDocs
         });
-    };
+        return true;
+    }, [navigation, make, model, year, plateNumber, color, vehicleType, fuelType, seatingCapacity, bootSpace, userData, existingDocs, capturedDocs, targetScreen]);
 
-    const handleSubmit = () => {
+    useFocusEffect(
+        React.useCallback(() => {
+            const onBackPress = () => {
+                handleBack();
+                return true;
+            };
+            const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+            return () => subscription.remove();
+        }, [handleBack])
+    );
+
+    const handleSubmit = async () => {
         if (!make || !model || !year || !plateNumber || !color) {
             Alert.alert("Missing Details", "Please fill in all vehicle details.");
             return;
         }
-
-        Alert.alert("Success", "Vehicle details saved successfully!");
-        const updatedList = Array.from(new Set([...existingDocs, 'Vehicle Details']));
 
         const vehicleDetails = {
             make,
@@ -80,7 +125,18 @@ const DriverVehicleDetailsScreen = () => {
             vehicle: vehicleDetails
         };
 
-        navigation.navigate(targetScreen as any, {
+        const updatedList = Array.from(new Set([...existingDocs, 'Vehicle Details']));
+
+        await driverOnboardingStorage.saveDraft({
+            userData: updatedUserData,
+            vehicleType,
+            capturedDocs,
+            uploadedDocuments: updatedList
+        });
+
+        Alert.alert("Success", "Vehicle details saved successfully!");
+
+        (navigation as any).navigate(targetScreen, {
             completedDocument: 'Vehicle Details',
             updatedDocList: updatedList,
             vehicleType,

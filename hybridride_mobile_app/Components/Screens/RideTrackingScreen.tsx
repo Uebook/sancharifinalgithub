@@ -21,6 +21,7 @@ import { Linking, Alert } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 import { GOOGLE_MAPS_API_KEY } from '../../Config/maps';
+import { getCurrentLocationAddress } from '../../Services/directionsService';
 
 const RideTrackingScreen = () => {
     const navigation = useNavigation();
@@ -45,22 +46,34 @@ const RideTrackingScreen = () => {
     const pickupCoords = (route.params as any)?.pickupCoords;
     const dropoffCoords = (route.params as any)?.dropoffCoords;
 
-    const PASSENGER_LOCATION = pickupCoords ? {
-        latitude: pickupCoords[1],
-        longitude: pickupCoords[0],
-    } : { latitude: 28.5355, longitude: 77.3910 };
+    const [passengerLoc, setPassengerLoc] = useState<{ latitude: number; longitude: number } | null>(
+        pickupCoords ? {
+            latitude: Number(pickupCoords[1] ?? pickupCoords.latitude),
+            longitude: Number(pickupCoords[0] ?? pickupCoords.longitude),
+        } : null
+    );
 
-    const DESTINATION_LOCATION = dropoffCoords ? {
-        latitude: dropoffCoords[1],
-        longitude: dropoffCoords[0],
-    } : { latitude: 28.5355, longitude: 77.3910 };
+    const [destLoc, setDestLoc] = useState<{ latitude: number; longitude: number } | null>(
+        dropoffCoords ? {
+            latitude: Number(dropoffCoords[1] ?? dropoffCoords.latitude),
+            longitude: Number(dropoffCoords[0] ?? dropoffCoords.longitude),
+        } : null
+    );
 
-    // In a real app, DRIVER_LOCATION would come from a socket.
-    // For now, we simulate the driver starting near the pickup or moving.
-    const DRIVER_LOCATION = {
-        latitude: PASSENGER_LOCATION.latitude + 0.005,
-        longitude: PASSENGER_LOCATION.longitude + 0.005,
-    };
+    useEffect(() => {
+        if (!passengerLoc) {
+            getCurrentLocationAddress().then(res => {
+                if (res) {
+                    setPassengerLoc({ latitude: res.latitude, longitude: res.longitude });
+                }
+            });
+        }
+    }, []);
+
+    const driverLoc = passengerLoc ? {
+        latitude: passengerLoc.latitude + 0.005,
+        longitude: passengerLoc.longitude + 0.005,
+    } : null;
 
     useEffect(() => {
         // Status Polling logic
@@ -136,36 +149,41 @@ const RideTrackingScreen = () => {
                     rotateEnabled={true}
                     zoomTapEnabled={true}
                     showsCompass={true}
+                    showsUserLocation={true}
                     minZoomLevel={3}
                     maxZoomLevel={20}
-                    initialRegion={{
-                        ...DRIVER_LOCATION,
+                    initialRegion={driverLoc || passengerLoc ? {
+                        ...(driverLoc || passengerLoc!),
                         latitudeDelta: 0.1,
                         longitudeDelta: 0.1,
-                    }}
+                    } : undefined}
                 >
-                    <MapViewDirections
-                        origin={DRIVER_LOCATION}
-                        destination={DESTINATION_LOCATION}
-                        apikey={GOOGLE_MAPS_API_KEY}
-                        strokeWidth={4}
-                        strokeColor="#10B981"
-                        onReady={(result) => {
-                            setEta(Math.ceil(result.duration));
-                            setDistance(result.distance);
-                            mapRef.current?.fitToCoordinates(result.coordinates, {
-                                edgePadding: { top: 50, right: 50, bottom: 400, left: 50 },
-                                animated: true,
-                            });
-                        }}
-                    />
-                    <Marker coordinate={DRIVER_LOCATION} title="Driver Location">
-                        <View style={styles.carCircle}>
-                            <FontAwesomeIcon icon={faCar} size={16} color="#FFFFFF" />
-                        </View>
-                    </Marker>
-                    <Marker coordinate={PASSENGER_LOCATION} title="Pickup Location" />
-                    <Marker coordinate={DESTINATION_LOCATION} title="Destination" />
+                    {driverLoc && destLoc && (
+                        <MapViewDirections
+                            origin={driverLoc}
+                            destination={destLoc}
+                            apikey={GOOGLE_MAPS_API_KEY}
+                            strokeWidth={4}
+                            strokeColor="#10B981"
+                            onReady={(result) => {
+                                setEta(Math.ceil(result.duration));
+                                setDistance(result.distance);
+                                mapRef.current?.fitToCoordinates(result.coordinates, {
+                                    edgePadding: { top: 50, right: 50, bottom: 400, left: 50 },
+                                    animated: true,
+                                });
+                            }}
+                        />
+                    )}
+                    {driverLoc && (
+                        <Marker coordinate={driverLoc} title="Driver Location">
+                            <View style={styles.carCircle}>
+                                <FontAwesomeIcon icon={faCar} size={16} color="#FFFFFF" />
+                            </View>
+                        </Marker>
+                    )}
+                    {passengerLoc && <Marker coordinate={passengerLoc} title="Pickup Location" />}
+                    {destLoc && <Marker coordinate={destLoc} title="Destination" />}
                 </MapView>
             </View>
 

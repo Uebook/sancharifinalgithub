@@ -43,14 +43,14 @@ const DriverCarCreateRouteScreen = () => {
     const initialPickupName = (route.params as any)?.pickup || 'Select pick-up location';
     const initialDropoffName = (route.params as any)?.destination || 'Select drop-off location';
 
-    const [pickup, setPickup] = useState({
+    const [pickup, setPickup] = useState<{ name: string; coords: { latitude: number; longitude: number } | null }>({
         name: initialPickupName,
-        coords: { latitude: 17.4486, longitude: 78.3808 }
+        coords: null
     });
 
-    const [dropoff, setDropoff] = useState({
+    const [dropoff, setDropoff] = useState<{ name: string; coords: { latitude: number; longitude: number } | null }>({
         name: initialDropoffName,
-        coords: { latitude: 17.4401, longitude: 78.3489 }
+        coords: null
     });
 
     // Dynamic Waypoints & Edit Target Mode
@@ -64,7 +64,11 @@ const DriverCarCreateRouteScreen = () => {
     // Geocode pickup and dropoff on mount
     useEffect(() => {
         const geocodeLocations = async () => {
-            const pickupCoords = await getCoordsFromAddress(initialPickupName);
+            let pickupCoords = await getCoordsFromAddress(initialPickupName);
+            if (!pickupCoords) {
+                const curr = await getCurrentLocationAddress();
+                if (curr) pickupCoords = { latitude: curr.latitude, longitude: curr.longitude };
+            }
             const dropoffCoords = await getCoordsFromAddress(initialDropoffName);
             if (pickupCoords) setPickup(p => ({ ...p, coords: pickupCoords }));
             if (dropoffCoords) setDropoff(d => ({ ...d, coords: dropoffCoords }));
@@ -77,7 +81,7 @@ const DriverCarCreateRouteScreen = () => {
         pickup.coords,
         ...stops.map(s => s.coords),
         dropoff.coords,
-    ];
+    ].filter((c): c is { latitude: number; longitude: number } => !!c);
 
     // Auto-fit map camera & recalculate route distance metrics whenever waypoints change
     useEffect(() => {
@@ -180,19 +184,22 @@ const DriverCarCreateRouteScreen = () => {
                 <MapView
                     ref={mapRef}
                     style={styles.map}
-                    initialRegion={{
+                    showsUserLocation={true}
+                    initialRegion={pickup.coords ? {
                         latitude: pickup.coords.latitude,
                         longitude: pickup.coords.longitude,
                         latitudeDelta: 0.08,
                         longitudeDelta: 0.08,
-                    }}
+                    } : undefined}
                 >
                     {/* Pickup Marker */}
-                    <Marker coordinate={pickup.coords} title="Pickup Location" description={pickup.name}>
-                        <View style={styles.originMarker}>
-                            <FontAwesomeIcon icon={faCircleDot} size={14} color="#10B981" />
-                        </View>
-                    </Marker>
+                    {pickup.coords && (
+                        <Marker coordinate={pickup.coords} title="Pickup Location" description={pickup.name}>
+                            <View style={styles.originMarker}>
+                                <FontAwesomeIcon icon={faCircleDot} size={14} color="#10B981" />
+                            </View>
+                        </Marker>
+                    )}
 
                     {/* Intermediate Waypoints Markers */}
                     {stops.map((stop, idx) => (
@@ -204,11 +211,13 @@ const DriverCarCreateRouteScreen = () => {
                     ))}
 
                     {/* Drop-off Marker */}
-                    <Marker coordinate={dropoff.coords} title="Drop-off Location" description={dropoff.name}>
-                        <View style={styles.destMarker}>
-                            <FontAwesomeIcon icon={faLocationDot} size={22} color="#EF4444" />
-                        </View>
-                    </Marker>
+                    {dropoff.coords && (
+                        <Marker coordinate={dropoff.coords} title="Drop-off Location" description={dropoff.name}>
+                            <View style={styles.destMarker}>
+                                <FontAwesomeIcon icon={faLocationDot} size={22} color="#EF4444" />
+                            </View>
+                        </Marker>
+                    )}
 
                     {/* Route Polyline Line connecting all waypoints */}
                     <Polyline

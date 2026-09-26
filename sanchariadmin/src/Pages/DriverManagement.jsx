@@ -5,7 +5,8 @@ import {
     MapPin, DollarSign, FileText, User, ChevronDown, Download,
     Plus, AlertTriangle, Star, X, Eye, ThumbsUp, ThumbsDown,
     Edit, Trash2, ShieldAlert, ShieldCheck, UserCheck, UserX, Car, Bike,
-    CreditCard, Shield, Phone, Mail, Award, AlertCircle, Compass, Wifi, WifiOff
+    CreditCard, Shield, Phone, Mail, Award, AlertCircle, Compass, Wifi, WifiOff,
+    Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
@@ -30,19 +31,19 @@ const complaintsData = [
     { id: 'C-002', driver: 'Mike Ross', passenger: 'Bob Brown', date: '2025-01-20', issue: 'Late arrival', status: 'resolved' },
 ];
 
-const Modal = ({ isOpen, onClose, title, children }) => (
+const Modal = ({ isOpen, onClose, title, maxWidth = 'max-w-2xl', children }) => (
     <AnimatePresence>
         {isOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="bg-slate-900 border border-slate-700 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col text-slate-100"
+                    className={`bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full ${maxWidth} overflow-hidden max-h-[90vh] flex flex-col text-slate-100`}
                 >
-                    <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+                    <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/60 sticky top-0 z-10">
                         <h3 className="text-lg font-bold text-white">{title}</h3>
-                        <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+                        <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors">
                             <X size={20} />
                         </button>
                     </div>
@@ -75,6 +76,170 @@ const DriverManagement = ({ view = 'directory' }) => {
     const [viewingImage, setViewingImage] = useState(null);
     const [selectedDriverDocs, setSelectedDriverDocs] = useState({});
     const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+    const [isLoadingPartners, setIsLoadingPartners] = useState(true);
+    const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+    const [isRejectBoxOpen, setIsRejectBoxOpen] = useState(false);
+
+    // Standard expected documents matrix with labels, categories & icons
+    const STANDARD_DOC_SECTIONS = [
+        {
+            category: 'Identity Proof',
+            icon: ShieldCheck,
+            items: [
+                {
+                    key: 'aadharFront',
+                    aliases: ['aadharFront', 'aadhar_front', 'aadhar'],
+                    title: 'Aadhaar Card (Front)',
+                    required: true,
+                    desc: 'Front side with photo & UIDAI number'
+                },
+                {
+                    key: 'aadharBack',
+                    aliases: ['aadharBack', 'aadhar_back'],
+                    title: 'Aadhaar Card (Back)',
+                    required: true,
+                    desc: 'Back side with address details'
+                },
+                {
+                    key: 'panCard',
+                    aliases: ['panCard', 'pan', 'pan_card'],
+                    title: 'PAN Card',
+                    required: false,
+                    desc: 'Permanent Account Number for tax compliance'
+                },
+            ]
+        },
+        {
+            category: 'Driving & Legal Licenses',
+            icon: CreditCard,
+            items: [
+                {
+                    key: 'licenseFront',
+                    aliases: ['licenseFront', 'license_front', 'license', 'drivingLicense'],
+                    title: 'Driving Licence (Front)',
+                    required: true,
+                    desc: 'Official motor vehicle driving licence'
+                },
+                {
+                    key: 'licenseBack',
+                    aliases: ['licenseBack', 'license_back'],
+                    title: 'Driving Licence (Back)',
+                    required: true,
+                    desc: 'Authorisation classes and expiry date'
+                },
+            ]
+        },
+        {
+            category: 'Vehicle Registration & Permits',
+            icon: Car,
+            items: [
+                {
+                    key: 'rc',
+                    aliases: ['rc', 'registration', 'rcFront', 'vehicleRC', 'rcBook'],
+                    title: 'Vehicle RC (Registration Certificate)',
+                    required: true,
+                    desc: 'Official vehicle registration certificate'
+                },
+                {
+                    key: 'insurance',
+                    aliases: ['insurance', 'insurancePolicy', 'vehicleInsurance'],
+                    title: 'Vehicle Insurance',
+                    required: true,
+                    desc: 'Commercial or comprehensive insurance policy'
+                },
+                {
+                    key: 'permit',
+                    aliases: ['permit', 'transportPermit', 'commercialPermit'],
+                    title: 'Commercial / State Permit',
+                    required: false,
+                    desc: 'Commercial transport authorization'
+                },
+                {
+                    key: 'fitness',
+                    aliases: ['fitness', 'fitnessCertificate'],
+                    title: 'Fitness Certificate',
+                    required: false,
+                    desc: 'RTO vehicle fitness certification'
+                },
+            ]
+        },
+        {
+            category: 'Partner Verification Profile',
+            icon: UserCheck,
+            items: [
+                {
+                    key: 'profileImage',
+                    aliases: ['profileImage', 'avatar', 'driverPhoto'],
+                    title: 'Partner Live Profile Photo',
+                    required: false,
+                    desc: 'Face capture for driver identification'
+                }
+            ]
+        }
+    ];
+
+    // Helper to find document URL by inspecting primary key and aliases
+    const getDocUrl = (docMap, aliases) => {
+        if (!docMap || typeof docMap !== 'object') return null;
+        for (const alias of aliases) {
+            if (docMap[alias] && typeof docMap[alias] === 'string' && docMap[alias].trim() !== '') {
+                return docMap[alias];
+            }
+        }
+        return null;
+    };
+
+    // Open Document Review Modal and fetch fresh document data
+    const openReviewDocsModal = async (applicant) => {
+        setSelectedApplicant(applicant);
+        setIsDocModalOpen(true);
+        setIsLoadingDocs(true);
+        setIsRejectBoxOpen(false);
+        setRejectionReasonInput(applicant.rejectionReason || '');
+
+        try {
+            const token = localStorage.getItem('adminToken');
+            const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/admin/drivers/${applicant.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data.success && res.data.data) {
+                const fetchedData = res.data.data;
+                const rawDocs = fetchedData.driverDetails?.documents || {};
+                const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/api\/?$/, '').replace(/\/$/, '');
+                
+                const mappedDocs = Object.fromEntries(
+                    Object.entries(rawDocs).map(([k, v]) => {
+                        if (!v) return [k, v];
+                        if (typeof v === 'string' && (v.startsWith('http') || v.startsWith('data:image'))) return [k, v];
+                        const filePath = typeof v === 'string' && v.startsWith('/') ? v : `/${v}`;
+                        return [k, `${baseUrl}${filePath}`];
+                    })
+                );
+
+                if (fetchedData.profileImage) {
+                    const pImg = fetchedData.profileImage;
+                    mappedDocs.profileImage = (pImg.startsWith('http') || pImg.startsWith('data:image'))
+                        ? pImg
+                        : `${baseUrl}${pImg.startsWith('/') ? pImg : `/${pImg}`}`;
+                }
+
+                setSelectedApplicant(prev => ({
+                    ...prev,
+                    ...fetchedData,
+                    id: fetchedData._id || prev?.id,
+                    documents: mappedDocs,
+                    licenseNumber: fetchedData.driverDetails?.licenseNumber || prev?.licenseNumber,
+                    vehicle: `${fetchedData.driverDetails?.vehicle?.make || ''} ${fetchedData.driverDetails?.vehicle?.model || ''}`.trim() || prev?.vehicle,
+                    vehicleType: fetchedData.driverDetails?.vehicle?.type || prev?.vehicleType,
+                    plateNumber: fetchedData.driverDetails?.vehicle?.plateNumber || prev?.plateNumber,
+                }));
+            }
+        } catch (err) {
+            console.error("Failed to fetch fresh applicant documents:", err);
+        } finally {
+            setIsLoadingDocs(false);
+        }
+    };
 
     // Pagination States
     const [dirPage, setDirPage] = useState(1);
@@ -90,10 +255,12 @@ const DriverManagement = ({ view = 'directory' }) => {
     }, []);
 
     const fetchDrivers = async () => {
+        setIsLoadingPartners(true);
         try {
             const token = localStorage.getItem('adminToken');
             const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/admin/drivers`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` },
+                timeout: 30000
             });
 
             if (res.data.success) {
@@ -157,6 +324,8 @@ const DriverManagement = ({ view = 'directory' }) => {
             }
         } catch (error) {
             console.error("Failed to fetch partners", error);
+        } finally {
+            setIsLoadingPartners(false);
         }
     };
 
@@ -184,12 +353,12 @@ const DriverManagement = ({ view = 'directory' }) => {
             });
             if (res.data.success) {
                 const rawDocs = res.data.data?.driverDetails?.documents || {};
+                const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/api\/?$/, '').replace(/\/$/, '');
                 const mappedDocs = Object.fromEntries(
                     Object.entries(rawDocs).map(([k, v]) => {
                         if (!v) return [k, v];
-                        if (v.startsWith('http')) return [k, v];
-                        const baseUrl = import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '');
-                        const filePath = v.startsWith('/') ? v : `/${v}`;
+                        if (typeof v === 'string' && (v.startsWith('http') || v.startsWith('data:'))) return [k, v];
+                        const filePath = typeof v === 'string' && v.startsWith('/') ? v : `/${v}`;
                         return [k, `${baseUrl}${filePath}`];
                     })
                 );
@@ -268,6 +437,7 @@ const DriverManagement = ({ view = 'directory' }) => {
             if (res.data.success) {
                 fetchDrivers();
                 setIsDocModalOpen(false);
+                setIsRejectBoxOpen(false);
             }
         } catch (error) {
             console.error(error);
@@ -275,9 +445,12 @@ const DriverManagement = ({ view = 'directory' }) => {
         }
     };
 
-    const handleReject = async (id) => {
-        const reason = prompt("Enter reason for rejection:", "Missing or unclear documents.");
-        if (reason === null) return;
+    const handleReject = async (id, explicitReason) => {
+        let reason = explicitReason !== undefined ? explicitReason : rejectionReasonInput;
+        if (!reason || !reason.trim()) {
+            reason = prompt("Enter reason for rejection:", "Photo is blurred — the registration number or details are not readable. Please re-upload in daylight.");
+            if (reason === null) return;
+        }
 
         try {
             const token = localStorage.getItem('adminToken');
@@ -289,6 +462,8 @@ const DriverManagement = ({ view = 'directory' }) => {
             if (res.data.success) {
                 fetchDrivers();
                 setIsDocModalOpen(false);
+                setIsRejectBoxOpen(false);
+                setRejectionReasonInput('');
             }
         } catch (error) {
             console.error(error);
@@ -545,8 +720,15 @@ const DriverManagement = ({ view = 'directory' }) => {
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                             {Object.entries(selectedDriverDocs).map(([key, url]) => (
                                 <div key={key} className="group cursor-pointer" onClick={() => setViewingImage({ url, title: key.replace(/([A-Z])/g, ' $1').trim() })}>
-                                    <div className="aspect-video bg-slate-800 rounded-xl overflow-hidden border border-slate-700 mb-2 relative">
-                                        <img src={url} alt={key} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                    <div className="aspect-video bg-slate-800 rounded-xl overflow-hidden border border-slate-700 mb-2 relative flex items-center justify-center">
+                                        <img
+                                            src={url}
+                                            alt={key}
+                                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                            onError={(e) => {
+                                                e.currentTarget.src = `https://placehold.co/600x400/1e293b/94a3b8?text=${encodeURIComponent(key.replace(/([A-Z])/g, ' $1').trim())}`;
+                                            }}
+                                        />
                                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
                                             <Eye className="text-white opacity-0 group-hover:opacity-100 drop-shadow-md" size={24} />
                                         </div>
@@ -723,112 +905,122 @@ const DriverManagement = ({ view = 'directory' }) => {
 
             {/* Partners Directory Table */}
             <div className="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead className="bg-slate-800/60 border-b border-slate-800">
-                            <tr>
-                                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider w-16">S.No.</th>
-                                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Sanchari Partner</th>
-                                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Contact Info</th>
-                                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Vehicle Specs</th>
-                                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
-                                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Earnings</th>
-                                <th className="text-right px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/50">
-                            {sortedPartners
-                                .slice((dirPage - 1) * dirLimit, dirPage * dirLimit)
-                                .map((driver, index) => (
-                                <tr
-                                    key={driver.id}
-                                    onClick={() => setSelectedDriver(driver)}
-                                    className="hover:bg-slate-800/30 transition-colors cursor-pointer group"
-                                >
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-500">
-                                        {(dirPage - 1) * dirLimit + index + 1}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-full border border-slate-700 overflow-hidden flex-shrink-0 bg-slate-800">
-                                                <img src={driver.avatar} alt={driver.name} className="w-full h-full object-cover" />
-                                            </div>
-                                            <div>
-                                                <div className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors flex items-center gap-2">
-                                                    {driver.name}
-                                                    {driver.vehicleType === 'BIKE' ? <Bike size={14} className="text-sky-400" /> : <Car size={14} className="text-emerald-400" />}
-                                                </div>
-                                                <div className="text-xs text-slate-400">Rating: {driver.rating} ⭐ ({driver.totalRides} Rides)</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-slate-200">{driver.phone}</div>
-                                        <div className="text-xs text-slate-400">{driver.email}</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-slate-200">{driver.vehicle} ({driver.vehicleType})</div>
-                                        <div className="text-xs font-semibold text-emerald-400">{driver.plateNumber}</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <StatusBadge status={driver.status} />
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-emerald-400">
-                                        ₹{driver.totalEarnings}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
-                                        <div className="flex items-center justify-end gap-1.5">
-                                            <button
-                                                onClick={() => setSelectedDriver(driver)}
-                                                className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl text-xs font-semibold transition-all shadow-sm"
-                                                title="View Full Partner Information"
-                                            >
-                                                <Eye size={14} /> View
-                                            </button>
-
-                                            <button
-                                                onClick={() => setEditingPartner(driver)}
-                                                className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
-                                                title="Edit Partner Profile"
-                                            >
-                                                <Edit size={16} />
-                                            </button>
-
-                                            <button
-                                                onClick={() => handleToggleStatus(driver, driver.status === 'suspended' ? 'approved' : 'suspended')}
-                                                className={`p-2 rounded-lg transition-colors ${driver.status === 'suspended' ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-rose-400 hover:bg-rose-500/10'}`}
-                                                title={driver.status === 'suspended' ? 'Activate Partner' : 'Suspend Partner'}
-                                            >
-                                                {driver.status === 'suspended' ? <UserCheck size={16} /> : <UserX size={16} />}
-                                            </button>
-
-                                            <button
-                                                onClick={() => setDeletingPartner(driver)}
-                                                className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                                                title="Delete Partner Account"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {sortedPartners.length === 0 && (
-                    <div className="p-8 text-center text-sm text-slate-400">
-                        No partners found matching your search.
+                {isLoadingPartners ? (
+                    <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
+                        <Loader2 className="animate-spin text-emerald-400" size={36} />
+                        <p className="text-sm font-semibold text-slate-200">Loading Sanchari partners...</p>
+                        <span className="text-xs text-slate-500">Fetching partner profiles, verification statuses and vehicle details</span>
                     </div>
+                ) : (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-slate-800/60 border-b border-slate-800">
+                                    <tr>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider w-16">S.No.</th>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Sanchari Partner</th>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Contact Info</th>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Vehicle Specs</th>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Earnings</th>
+                                        <th className="text-right px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                    {sortedPartners
+                                        .slice((dirPage - 1) * dirLimit, dirPage * dirLimit)
+                                        .map((driver, index) => (
+                                        <tr
+                                            key={driver.id}
+                                            onClick={() => setSelectedDriver(driver)}
+                                            className="hover:bg-slate-800/30 transition-colors cursor-pointer group"
+                                        >
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-500">
+                                                {(dirPage - 1) * dirLimit + index + 1}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-10 w-10 rounded-full border border-slate-700 overflow-hidden flex-shrink-0 bg-slate-800">
+                                                        <img src={driver.avatar} alt={driver.name} className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors flex items-center gap-2">
+                                                            {driver.name}
+                                                            {driver.vehicleType === 'BIKE' ? <Bike size={14} className="text-sky-400" /> : <Car size={14} className="text-emerald-400" />}
+                                                        </div>
+                                                        <div className="text-xs text-slate-400">Rating: {driver.rating} ⭐ ({driver.totalRides} Rides)</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="text-sm text-slate-200">{driver.phone}</div>
+                                                <div className="text-xs text-slate-400">{driver.email}</div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="text-sm text-slate-200">{driver.vehicle} ({driver.vehicleType})</div>
+                                                <div className="text-xs font-semibold text-emerald-400">{driver.plateNumber}</div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <StatusBadge status={driver.status} />
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-emerald-400">
+                                                ₹{driver.totalEarnings}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    <button
+                                                        onClick={() => setSelectedDriver(driver)}
+                                                        className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl text-xs font-semibold transition-all shadow-sm"
+                                                        title="View Full Partner Information"
+                                                    >
+                                                        <Eye size={14} /> View
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => setEditingPartner(driver)}
+                                                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                                                        title="Edit Partner Profile"
+                                                    >
+                                                        <Edit size={16} />
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => handleToggleStatus(driver, driver.status === 'suspended' ? 'approved' : 'suspended')}
+                                                        className={`p-2 rounded-lg transition-colors ${driver.status === 'suspended' ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-rose-400 hover:bg-rose-500/10'}`}
+                                                        title={driver.status === 'suspended' ? 'Activate Partner' : 'Suspend Partner'}
+                                                    >
+                                                        {driver.status === 'suspended' ? <UserCheck size={16} /> : <UserX size={16} />}
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => setDeletingPartner(driver)}
+                                                        className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                                        title="Delete Partner Account"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {sortedPartners.length === 0 && (
+                            <div className="p-12 text-center text-sm text-slate-400">
+                                No partners found matching your search.
+                            </div>
+                        )}
+                        <Pagination
+                            currentPage={dirPage}
+                            totalItems={sortedPartners.length}
+                            itemsPerPage={dirLimit}
+                            onPageChange={setDirPage}
+                            onItemsPerPageChange={setDirLimit}
+                        />
+                    </>
                 )}
-                <Pagination
-                    currentPage={dirPage}
-                    totalItems={sortedPartners.length}
-                    itemsPerPage={dirLimit}
-                    onPageChange={setDirPage}
-                    onItemsPerPageChange={setDirLimit}
-                />
             </div>
         </div>
     );
@@ -840,73 +1032,96 @@ const DriverManagement = ({ view = 'directory' }) => {
                     <h2 className="text-xl font-bold text-white">Partner Onboarding Verification Requests</h2>
                     <p className="text-xs text-slate-400 mt-1">Verify submitted driving licenses, vehicle registrations, and identity documents before approving Sanchari partners.</p>
                 </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead className="bg-slate-800/60 border-b border-slate-800">
-                            <tr>
-                                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Partner Applicant</th>
-                                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Contact Info</th>
-                                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Vehicle Type</th>
-                                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Submitted Date</th>
-                                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Status</th>
-                                <th className="text-right px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Verification Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/50">
-                            {onboardingList.map((applicant) => (
-                                <tr key={applicant.id} className="hover:bg-slate-800/30 transition-colors">
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-full border border-slate-700 overflow-hidden bg-slate-800">
-                                                <img src={applicant.avatar} alt={applicant.name} className="w-full h-full object-cover" />
-                                            </div>
-                                            <div className="text-sm font-semibold text-white">{applicant.name}</div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                        <div>{applicant.phone}</div>
-                                        <div className="text-xs text-slate-400">{applicant.email}</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                        {applicant.vehicleType} ({applicant.vehicle})
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
-                                        {applicant.joinDate}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <StatusBadge status={applicant.status} />
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <button
-                                                onClick={() => { setSelectedApplicant(applicant); setIsDocModalOpen(true); }}
-                                                className="px-3 py-1.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold hover:bg-blue-500/20 transition-all flex items-center gap-1"
-                                            >
-                                                <FileText size={14} /> Review Docs
-                                            </button>
-                                            <button
-                                                onClick={() => handleApprove(applicant.id)}
-                                                className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
-                                                title="Approve Partner"
-                                            >
-                                                <ThumbsUp size={18} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleReject(applicant.id)}
-                                                className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                                                title="Reject Partner"
-                                            >
-                                                <ThumbsDown size={18} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-                {onboardingList.length === 0 && (
-                    <div className="p-8 text-center text-sm text-slate-400">No pending partner onboarding requests.</div>
+                {isLoadingPartners ? (
+                    <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
+                        <Loader2 className="animate-spin text-blue-400" size={36} />
+                        <p className="text-sm font-semibold text-slate-200">Loading onboarding verification requests...</p>
+                        <span className="text-xs text-slate-500">Checking pending documents and driver applications</span>
+                    </div>
+                ) : (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-slate-800/60 border-b border-slate-800">
+                                    <tr>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Partner Applicant</th>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Contact Info</th>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Vehicle Type</th>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Submitted Date</th>
+                                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Status</th>
+                                        <th className="text-right px-6 py-4 text-xs font-semibold text-slate-400 uppercase">Verification Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                    {onboardingList.map((applicant) => (
+                                        <tr key={applicant.id} className="hover:bg-slate-800/30 transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-10 w-10 rounded-full border border-slate-700 overflow-hidden bg-slate-800">
+                                                        <img src={applicant.avatar} alt={applicant.name} className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <div className="text-sm font-semibold text-white">{applicant.name}</div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                                <div>{applicant.phone}</div>
+                                                <div className="text-xs text-slate-400">{applicant.email}</div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                                {applicant.vehicleType} ({applicant.vehicle})
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">
+                                                {applicant.joinDate}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <StatusBadge status={applicant.status} />
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => openReviewDocsModal(applicant)}
+                                                        className="px-3 py-1.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-xl text-xs font-semibold hover:bg-blue-500/20 transition-all flex items-center gap-1.5 shadow-sm"
+                                                    >
+                                                        <FileText size={14} /> Review Docs
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleApprove(applicant.id)}
+                                                        className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                                        title="Approve Partner"
+                                                    >
+                                                        <ThumbsUp size={18} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedApplicant(applicant);
+                                                            setIsDocModalOpen(true);
+                                                            setIsRejectBoxOpen(true);
+                                                        }}
+                                                        className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                                        title="Reject Partner"
+                                                    >
+                                                        <ThumbsDown size={18} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {onboardingList.length === 0 && (
+                            <div className="p-12 text-center text-sm text-slate-400">
+                                No pending partner onboarding requests.
+                            </div>
+                        )}
+                        <Pagination
+                            currentPage={onbPage}
+                            totalItems={onboardingList.length}
+                            itemsPerPage={onbLimit}
+                            onPageChange={setOnbPage}
+                            onItemsPerPageChange={setOnbLimit}
+                        />
+                    </>
                 )}
             </div>
         </div>
@@ -940,40 +1155,274 @@ const DriverManagement = ({ view = 'directory' }) => {
                 </>
             )}
 
-            {/* Document Review Modal */}
+            {/* Comprehensive Document Verification Modal */}
             <Modal
                 isOpen={isDocModalOpen}
-                onClose={() => setIsDocModalOpen(false)}
-                title={`Document Verification - ${selectedApplicant?.name}`}
+                onClose={() => {
+                    setIsDocModalOpen(false);
+                    setIsRejectBoxOpen(false);
+                }}
+                title={`Partner Document Verification — ${selectedApplicant?.name || 'Applicant'}`}
+                maxWidth="max-w-5xl"
             >
                 {selectedApplicant && (
                     <div className="space-y-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {Object.entries(selectedApplicant.documents || {}).map(([docType, url]) => (
-                                url && (
-                                    <div key={docType} className="border border-slate-800 rounded-xl p-3 bg-slate-950">
-                                        <p className="text-xs font-semibold text-slate-400 mb-2 capitalize">{docType.replace(/([A-Z])/g, ' $1').trim()}</p>
-                                        <div className="aspect-video bg-slate-900 rounded-lg overflow-hidden border border-slate-800 relative cursor-pointer" onClick={() => setViewingImage({ url, title: docType })}>
-                                            <img src={url} alt={docType} className="w-full h-full object-cover" />
-                                        </div>
+                        {/* Applicant & Vehicle Summary Header Banner */}
+                        <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="h-14 w-14 rounded-2xl border border-slate-700 overflow-hidden bg-slate-800 flex-shrink-0 shadow-inner">
+                                    <img 
+                                        src={selectedApplicant.avatar || selectedApplicant.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedApplicant.name)}`} 
+                                        alt={selectedApplicant.name} 
+                                        className="w-full h-full object-cover" 
+                                    />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2.5">
+                                        <h4 className="text-lg font-bold text-white">{selectedApplicant.name}</h4>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
+                                            selectedApplicant.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                            selectedApplicant.status === 'rejected' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                                            'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                        }`}>
+                                            {selectedApplicant.status || 'Pending'}
+                                        </span>
                                     </div>
-                                )
-                            ))}
+                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 mt-1">
+                                        <span className="flex items-center gap-1"><Phone size={12} className="text-slate-500" /> {selectedApplicant.phone || 'N/A'}</span>
+                                        <span className="flex items-center gap-1"><Mail size={12} className="text-slate-500" /> {selectedApplicant.email || 'N/A'}</span>
+                                        <span className="flex items-center gap-1"><Clock size={12} className="text-slate-500" /> Joined {selectedApplicant.joinDate}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Vehicle Specs Pill */}
+                            <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-300 flex items-center gap-3">
+                                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                                    <Car size={18} />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-white capitalize">{selectedApplicant.vehicleType || 'Vehicle'} • {selectedApplicant.vehicle || 'Vehicle Details Pending'}</p>
+                                    <p className="text-slate-400 font-mono mt-0.5">Plate: <span className="text-emerald-400 font-bold">{selectedApplicant.plateNumber || 'N/A'}</span> {selectedApplicant.licenseNumber && `• DL: ${selectedApplicant.licenseNumber}`}</p>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-                            <button
-                                onClick={() => handleReject(selectedApplicant.id)}
-                                className="px-4 py-2 bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 rounded-xl text-sm font-semibold transition-colors"
+                        {/* Rejection Notice Banner (if already rejected or has rejection reason) */}
+                        {selectedApplicant.rejectionReason && (
+                            <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-3">
+                                <AlertTriangle className="text-rose-400 flex-shrink-0 mt-0.5" size={18} />
+                                <div>
+                                    <p className="text-xs font-bold text-rose-300">Previous Rejection Note:</p>
+                                    <p className="text-xs text-rose-200 mt-0.5">{selectedApplicant.rejectionReason}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {isLoadingDocs ? (
+                            <div className="py-16 text-center text-slate-400">
+                                <Clock className="animate-spin mx-auto mb-2 text-emerald-400" size={24} />
+                                <p className="text-sm">Loading partner verification documents...</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {STANDARD_DOC_SECTIONS.map((section, sIdx) => {
+                                    const SectionIcon = section.icon;
+                                    return (
+                                        <div key={sIdx} className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5">
+                                            <div className="flex items-center justify-between mb-4 border-b border-slate-800/80 pb-2.5">
+                                                <div className="flex items-center gap-2.5">
+                                                    <SectionIcon size={16} className="text-emerald-400" />
+                                                    <h5 className="text-sm font-bold text-white tracking-wide">{section.category}</h5>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                {section.items.map((item) => {
+                                                    const docUrl = getDocUrl(selectedApplicant.documents, item.aliases);
+                                                    const isUploaded = !!docUrl;
+
+                                                    return (
+                                                        <div 
+                                                            key={item.key} 
+                                                            className={`rounded-xl border p-3.5 flex flex-col justify-between transition-all ${
+                                                                isUploaded 
+                                                                    ? 'bg-slate-900/90 border-slate-700/80 hover:border-emerald-500/50 shadow-sm' 
+                                                                    : 'bg-slate-900/30 border-dashed border-slate-800'
+                                                            }`}
+                                                        >
+                                                            <div>
+                                                                <div className="flex items-center justify-between gap-2 mb-2">
+                                                                    <p className="text-xs font-bold text-white line-clamp-1">{item.title}</p>
+                                                                    {isUploaded ? (
+                                                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                                                                            <CheckCircle size={10} /> Uploaded
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                                                            item.required 
+                                                                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
+                                                                                : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                                                        }`}>
+                                                                            {item.required ? 'Missing' : 'Optional'}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-[11px] text-slate-400 mb-3">{item.desc}</p>
+                                                            </div>
+
+                                                            {isUploaded ? (
+                                                                <div 
+                                                                    className="aspect-video w-full bg-slate-950 rounded-lg overflow-hidden border border-slate-800 relative cursor-pointer group shadow-inner"
+                                                                    onClick={() => setViewingImage({ url: docUrl, title: `${selectedApplicant.name} — ${item.title}` })}
+                                                                >
+                                                                    <img 
+                                                                        src={docUrl} 
+                                                                        alt={item.title} 
+                                                                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" 
+                                                                    />
+                                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                                                                        <span className="px-3 py-1.5 bg-black/70 backdrop-blur-md rounded-lg text-white text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 shadow-lg">
+                                                                            <Eye size={14} /> Enlarge View
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="aspect-video w-full rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-500 p-3 bg-slate-950/40">
+                                                                    <AlertCircle size={20} className="mb-1 text-slate-600" />
+                                                                    <span className="text-[11px] text-slate-500 font-medium">No document uploaded</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {/* Additional / Unmapped Uploads (if any) */}
+                                {selectedApplicant.documents && Object.entries(selectedApplicant.documents).filter(([k, v]) => {
+                                    if (!v) return false;
+                                    const allKnownAliases = STANDARD_DOC_SECTIONS.flatMap(s => s.items.flatMap(i => i.aliases));
+                                    return !allKnownAliases.includes(k);
+                                }).length > 0 && (
+                                    <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5">
+                                        <h5 className="text-sm font-bold text-white tracking-wide mb-3 flex items-center gap-2">
+                                            <FileText size={16} className="text-blue-400" /> Additional Uploaded Files
+                                        </h5>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {Object.entries(selectedApplicant.documents).filter(([k, v]) => {
+                                                if (!v) return false;
+                                                const allKnownAliases = STANDARD_DOC_SECTIONS.flatMap(s => s.items.flatMap(i => i.aliases));
+                                                return !allKnownAliases.includes(k);
+                                            }).map(([docType, url]) => (
+                                                <div key={docType} className="border border-slate-700/80 rounded-xl p-3 bg-slate-900/90 shadow-sm">
+                                                    <p className="text-xs font-bold text-slate-300 mb-2 capitalize">{docType.replace(/([A-Z])/g, ' $1').trim()}</p>
+                                                    <div 
+                                                        className="aspect-video bg-slate-950 rounded-lg overflow-hidden border border-slate-800 relative cursor-pointer group"
+                                                        onClick={() => setViewingImage({ url, title: docType })}
+                                                    >
+                                                        <img src={url} alt={docType} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                                                            <Eye size={20} className="text-white opacity-0 group-hover:opacity-100" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Rejection Reason Form Section */}
+                        {isRejectBoxOpen && (
+                            <motion.div 
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-3"
                             >
-                                Reject Applicant
-                            </button>
+                                <div className="flex items-center justify-between">
+                                    <h5 className="text-sm font-bold text-rose-300 flex items-center gap-2">
+                                        <AlertTriangle size={16} /> Specify Reason for Rejection
+                                    </h5>
+                                    <button 
+                                        onClick={() => setIsRejectBoxOpen(false)}
+                                        className="text-xs text-slate-400 hover:text-white"
+                                    >
+                                        Cancel Rejection
+                                    </button>
+                                </div>
+                                <p className="text-xs text-slate-300">
+                                    This message will be shown directly on the partner's app screen (Action Needed state) so they can re-upload the correct document.
+                                </p>
+
+                                {/* Quick Preset Buttons */}
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                    {[
+                                        "Photo is blurred — the registration number is not readable. Please re-upload in daylight.",
+                                        "Driving licence is expired or invalid. Please upload a valid driving licence.",
+                                        "Vehicle RC plate number does not match registered vehicle details.",
+                                        "Aadhaar card details are not legible. Please re-upload clear photos of front and back.",
+                                        "Vehicle insurance document is expired or incomplete."
+                                    ].map((preset, pIdx) => (
+                                        <button
+                                            key={pIdx}
+                                            type="button"
+                                            onClick={() => setRejectionReasonInput(preset)}
+                                            className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] text-slate-300 rounded-lg transition-colors text-left"
+                                        >
+                                            {preset.length > 50 ? `${preset.substring(0, 50)}...` : preset}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <textarea
+                                    value={rejectionReasonInput}
+                                    onChange={(e) => setRejectionReasonInput(e.target.value)}
+                                    placeholder="Enter detailed reason for rejection..."
+                                    className="w-full p-3 rounded-xl border border-rose-500/30 bg-slate-900 text-white text-xs focus:outline-none focus:ring-2 focus:ring-rose-500"
+                                    rows={3}
+                                />
+
+                                <div className="flex justify-end gap-2 pt-1">
+                                    <button
+                                        onClick={() => handleReject(selectedApplicant.id, rejectionReasonInput)}
+                                        disabled={!rejectionReasonInput.trim()}
+                                        className="px-4 py-2 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors shadow-lg shadow-rose-500/20"
+                                    >
+                                        Confirm & Send Rejection
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* Action Footer */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800">
                             <button
-                                onClick={() => handleApprove(selectedApplicant.id)}
-                                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold transition-colors shadow-lg shadow-emerald-500/20"
+                                onClick={() => setIsDocModalOpen(false)}
+                                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-medium transition-colors"
                             >
-                                Approve Partner
+                                Close
                             </button>
+
+                            <div className="flex items-center gap-3">
+                                {!isRejectBoxOpen && (
+                                    <button
+                                        onClick={() => setIsRejectBoxOpen(true)}
+                                        className="px-4 py-2 bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 rounded-xl text-sm font-semibold transition-colors flex items-center gap-1.5"
+                                    >
+                                        <ThumbsDown size={16} /> Reject Applicant
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => handleApprove(selectedApplicant.id)}
+                                    className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold transition-colors shadow-lg shadow-emerald-500/20 flex items-center gap-1.5"
+                                >
+                                    <CheckCircle size={16} /> Approve Partner
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

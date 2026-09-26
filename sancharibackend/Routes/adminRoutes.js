@@ -42,7 +42,11 @@ import {
     addDriverOffer,
     getDriverOffers,
     updateDriverOffer,
-    deleteDriverOffer
+    deleteDriverOffer,
+    getPayoutSettings,
+    updatePayoutSettings,
+    testPayoutConnection,
+    processCashfreeWithdrawalPayout
 } from '../Controllers/adminController.js';
 
 const router = express.Router();
@@ -78,6 +82,12 @@ router.get('/rides', getAllRides);
 router.get('/rides/:id', getRideById);
 router.get('/withdrawals', getWithdrawals);
 router.put('/withdrawals/:id', updateWithdrawalStatus);
+router.post('/withdrawals/:id/payout', processCashfreeWithdrawalPayout);
+
+// Payout Settings
+router.get('/settings/payout', getPayoutSettings);
+router.put('/settings/payout', updatePayoutSettings);
+router.post('/settings/payout/test-connection', testPayoutConnection);
 
 // Promoted Routes
 router.post('/promoted-routes', upload.single('image'), addPromotedRoute);

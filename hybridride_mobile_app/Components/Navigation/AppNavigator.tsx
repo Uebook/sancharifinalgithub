@@ -146,6 +146,7 @@ const AppNavigator = () => {
                         <Stack.Screen name="DriverRating" component={DriverRatingScreen} />
                         <Stack.Screen name="DriverChat" component={DriverChatScreen} />
                         <Stack.Screen name="DriverVehicleDetails" component={DriverVehicleDetailsScreen} />
+                        <Stack.Screen name="DriverPendingApproval" component={DriverPendingApprovalScreen} />
                         {/* Shared/Common screens can be added here if needed by drivers too, e.g. Wallet/Support */}
                         <Stack.Screen name="Wallet" component={WalletScreen} />
                         <Stack.Screen name="Support" component={SupportScreen} />

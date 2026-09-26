@@ -20,6 +20,7 @@ import { getActiveRide, updateRideStatus } from '../../Services/rideService';
 import { Linking, Alert } from 'react-native';
 import DriverChatModal from './DriverChatModal';
 import CancellationModal from './CancellationModal';
+import { getCurrentLocationAddress } from '../../Services/directionsService';
 
 const { width } = Dimensions.get('window');
 
@@ -36,16 +37,28 @@ const DriverAcceptedScreen = () => {
     const [etaMinutes, setEtaMinutes] = React.useState<number | null>(null);
     const [bookingOtp, setBookingOtp] = React.useState<string>('----');
 
-    // Simulated driver location (nearby pickup)
-    const pickupCoords = {
-        latitude: (route.params as any)?.pickupCoords?.[1] || 28.6139,
-        longitude: (route.params as any)?.pickupCoords?.[0] || 77.2090,
-    };
+    const rawCoords = (route.params as any)?.pickupCoords;
+    const [pickupCoords, setPickupCoords] = React.useState<{ latitude: number; longitude: number } | null>(
+        rawCoords ? {
+            latitude: Number(rawCoords[1] ?? rawCoords.latitude),
+            longitude: Number(rawCoords[0] ?? rawCoords.longitude),
+        } : null
+    );
 
-    const driverCoords = {
+    React.useEffect(() => {
+        if (!pickupCoords) {
+            getCurrentLocationAddress().then(res => {
+                if (res) {
+                    setPickupCoords({ latitude: res.latitude, longitude: res.longitude });
+                }
+            });
+        }
+    }, []);
+
+    const driverCoords = pickupCoords ? {
         latitude: pickupCoords.latitude + 0.005,
         longitude: pickupCoords.longitude + 0.005,
-    };
+    } : null;
 
     // Dynamic driver data with fallback
     const driverName = driver?.name || "Driver";
@@ -159,33 +172,38 @@ const DriverAcceptedScreen = () => {
                 <MapView
                     provider={PROVIDER_GOOGLE}
                     style={StyleSheet.absoluteFill}
-                    initialRegion={{
+                    showsUserLocation={true}
+                    initialRegion={pickupCoords ? {
                         ...pickupCoords,
                         latitudeDelta: 0.015,
                         longitudeDelta: 0.0121,
-                    }}
+                    } : undefined}
                 >
-                    <Marker coordinate={pickupCoords} title="Pickup Location" />
-                    <Marker
-                        coordinate={driverCoords}
-                        title={driverName}
-                        description={driverCar}
-                    >
-                        <View style={styles.driverMarker}>
-                            <FontAwesomeIcon icon={faCar} size={14} color="#FFFFFF" />
-                        </View>
-                    </Marker>
+                    {pickupCoords && <Marker coordinate={pickupCoords} title="Pickup Location" />}
+                    {driverCoords && (
+                        <Marker
+                            coordinate={driverCoords}
+                            title={driverName}
+                            description={driverCar}
+                        >
+                            <View style={styles.driverMarker}>
+                                <FontAwesomeIcon icon={faCar} size={14} color="#FFFFFF" />
+                            </View>
+                        </Marker>
+                    )}
 
-                    <MapViewDirections
-                        origin={driverCoords}
-                        destination={pickupCoords}
-                        apikey={GOOGLE_MAPS_API_KEY}
-                        strokeWidth={4}
-                        strokeColor="#111827"
-                        onReady={(result) => {
-                            setEtaMinutes(Math.ceil(result.duration));
-                        }}
-                    />
+                    {driverCoords && pickupCoords && (
+                        <MapViewDirections
+                            origin={driverCoords}
+                            destination={pickupCoords}
+                            apikey={GOOGLE_MAPS_API_KEY}
+                            strokeWidth={4}
+                            strokeColor="#111827"
+                            onReady={(result) => {
+                                setEtaMinutes(Math.ceil(result.duration));
+                            }}
+                        />
+                    )}
                 </MapView>
             </View>
 
@@ -259,7 +277,7 @@ const DriverAcceptedScreen = () => {
                     onPress={() => (navigation as any).navigate('RideTracking', {
                         driver,
                         bookingId,
-                        pickupCoords: [pickupCoords.longitude, pickupCoords.latitude],
+                        pickupCoords: pickupCoords ? [pickupCoords.longitude, pickupCoords.latitude] : (route.params as any)?.pickupCoords,
                         dropoffCoords: (route.params as any)?.dropoffCoords
                     })}
                 >

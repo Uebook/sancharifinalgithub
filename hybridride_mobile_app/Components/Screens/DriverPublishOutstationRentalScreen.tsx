@@ -106,13 +106,25 @@ const DriverPublishOutstationRentalScreen = () => {
     const handleGoLive = async () => {
         try {
             await AsyncStorage.getItem('userToken');
+
+            let oCoords = originCoords;
+            if (!oCoords && origin) {
+                const geo = await getCoordsFromAddress(origin);
+                if (geo) oCoords = [geo.longitude, geo.latitude];
+            }
+            let dCoords = destinationCoords;
+            if (!dCoords && destination) {
+                const geo = await getCoordsFromAddress(destination);
+                if (geo) dCoords = [geo.longitude, geo.latitude];
+            }
+
             const response = await poolService.publishRide({
                 type: 'rental',
                 poolCategory: 'OUTSTATION_RENTAL',
                 originName: origin,
-                originCoords: originCoords || [78.4867, 17.3850], // Fallback default coords
+                originCoords: oCoords || undefined,
                 destinationName: destination,
-                destinationCoords: destinationCoords || [79.5941, 17.9689], // Fallback default coords
+                destinationCoords: dCoords || undefined,
                 scheduledTime: new Date().toISOString(),
                 vehicle: vehicleModel,
                 vehicleType,

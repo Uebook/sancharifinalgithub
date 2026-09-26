@@ -31,8 +31,8 @@ const DriverCarChooseRouteScreen = () => {
     const seats = (route.params as any)?.seats || 3;
     const pricePerSeat = (route.params as any)?.pricePerSeat || 90;
 
-    const [originCoords, setOriginCoords] = useState({ latitude: 17.4486, longitude: 78.3808 });
-    const [destCoords, setDestCoords] = useState({ latitude: 17.4401, longitude: 78.3489 });
+    const [originCoords, setOriginCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [destCoords, setDestCoords] = useState<{ latitude: number; longitude: number } | null>(null);
 
     const [routesList, setRoutesList] = useState<RouteOption[]>([]);
     const [selectedRouteId, setSelectedRouteId] = useState<'PREFERRED' | 'ALT1'>('PREFERRED');
@@ -43,14 +43,20 @@ const DriverCarChooseRouteScreen = () => {
     useEffect(() => {
         const loadDynamicRoutes = async () => {
             setIsLoadingRoutes(true);
-            const origin = await getCoordsFromAddress(pickup);
+            let origin = await getCoordsFromAddress(pickup);
+            if (!origin) {
+                const curr = await getCurrentLocationAddress();
+                if (curr) origin = { latitude: curr.latitude, longitude: curr.longitude };
+            }
             const dest = await getCoordsFromAddress(destination);
 
-            setOriginCoords(origin);
-            setDestCoords(dest);
+            if (origin) setOriginCoords(origin);
+            if (dest) setDestCoords(dest);
 
-            const fetched = await fetchGoogleRoutes(origin, dest, 'driving');
-            setRoutesList(fetched);
+            if (origin && dest) {
+                const fetched = await fetchGoogleRoutes(origin, dest, 'driving');
+                setRoutesList(fetched);
+            }
             setIsLoadingRoutes(false);
         };
         loadDynamicRoutes();
@@ -73,6 +79,10 @@ const DriverCarChooseRouteScreen = () => {
 
     const handleConfirmRoute = async () => {
         if (isPublishing || !activeRoute) return;
+        if (!originCoords || !destCoords) {
+            Alert.alert("Location Missing", "Could not determine pickup and drop-off coordinates.");
+            return;
+        }
         setIsPublishing(true);
 
         try {
@@ -132,33 +142,51 @@ const DriverCarChooseRouteScreen = () => {
                 <MapView
                     ref={mapRef}
                     style={styles.map}
-                    initialRegion={{
+                    showsUserLocation={true}
+                    initialRegion={originCoords && destCoords ? {
                         latitude: (originCoords.latitude + destCoords.latitude) / 2,
                         longitude: (originCoords.longitude + destCoords.longitude) / 2,
                         latitudeDelta: 0.08,
                         longitudeDelta: 0.08,
-                    }}
+                    } : originCoords ? {
+                        latitude: originCoords.latitude,
+                        longitude: originCoords.longitude,
+                        latitudeDelta: 0.08,
+                        longitudeDelta: 0.08,
+                    } : undefined}
                 >
                     {/* Pickup Marker */}
-                    <Marker coordinate={originCoords} title="Pickup Location" description={pickup}>
-                        <View style={styles.originMarker}>
-                            <FontAwesomeIcon icon={faCircleDot} size={14} color="#10B981" />
-                        </View>
-                    </Marker>
+                    {originCoords && (
+                        <Marker coordinate={originCoords} title="Pickup Location" description={pickup}>
+                            <View style={styles.originMarker}>
+                                <FontAwesomeIcon icon={faCircleDot} size={14} color="#10B981" />
+                            </View>
+                        </Marker>
+                    )}
 
                     {/* Destination Marker */}
-                    <Marker coordinate={destCoords} title="Destination" description={destination}>
-                        <View style={styles.destMarker}>
-                            <FontAwesomeIcon icon={faLocationDot} size={22} color="#EF4444" />
-                        </View>
-                    </Marker>
+                    {destCoords && (
+                        <Marker coordinate={destCoords} title="Destination" description={destination}>
+                            <View style={styles.destMarker}>
+                                <FontAwesomeIcon icon={faLocationDot} size={22} color="#EF4444" />
+                            </View>
+                        </Marker>
+                    )}
 
                     {/* Dynamic Google Maps Route Polyline Direction Line */}
-                    <Polyline
-                        coordinates={(activeRoute?.coordinates && activeRoute.coordinates.length > 0) ? activeRoute.coordinates : [originCoords, destCoords]}
-                        strokeColor={activeColor}
-                        strokeWidth={6}
-                    />
+                    {activeRoute?.coordinates && activeRoute.coordinates.length > 0 ? (
+                        <Polyline
+                            coordinates={activeRoute.coordinates}
+                            strokeColor={activeColor}
+                            strokeWidth={6}
+                        />
+                    ) : originCoords && destCoords ? (
+                        <Polyline
+                            coordinates={[originCoords, destCoords]}
+                            strokeColor={activeColor}
+                            strokeWidth={6}
+                        />
+                    ) : null}
                 </MapView>
 
                 {/* Floating "Create Custom Waypoints" Button */}

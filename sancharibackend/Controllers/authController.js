@@ -217,20 +217,32 @@ export const login = async (req, res) => {
       });
     }
 
-    // Generate 6-digit OTP (Fixed 123456 for test number 8439993033, random for all other numbers)
+    // Generate 6-digit OTP
     const cleanUserPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
-    const otp = cleanUserPhone === '8439993033' ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
+    const TEST_NUMBERS = ['8439993033', '8439993031'];
+    const isTestNumber = TEST_NUMBERS.includes(cleanUserPhone);
+    const bypassOtp = isTestNumber || process.env.BYPASS_OTP === 'true';
+    const otp = bypassOtp ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     user.otp = otp;
     user.otpExpires = otpExpires;
     await user.save();
 
-    // Send SMS
+    // ─── BYPASS: Skip SMS/WhatsApp for test number or BYPASS_OTP mode ───
+    if (bypassOtp) {
+      console.log(`[OTP BYPASS] Test number ${cleanUserPhone} — OTP is 123456, skipping SMS/WhatsApp gateway.`);
+      return sendSuccess(res, 200, 'OTP sent to your phone', {
+        otpRequired: true,
+        phone: user.phone,
+        devOtp: '123456'
+      });
+    }
+
+    // Send SMS for real numbers
     const templateId = process.env.SMS_TEMPLATE_ID || 23379;
 
     try {
-      // Using approved template 23379
       await sendPersonalizedSMS([
         {
           number: user.phone,
@@ -248,12 +260,11 @@ export const login = async (req, res) => {
         await sendWhatsAppOTP(
           user.phone,
           process.env.WHATSAPP_TEMPLATE_NAME,
-          [otp] // Authentication templates usually only take the OTP code
+          [otp]
         );
       }
     } catch (smsError) {
       console.error('Failed to send OTP SMS:', smsError);
-      // In dev, we might want to still allow login or at least show the OTP in console
       if (process.env.NODE_ENV === 'development') {
         console.log(`[DEV ONLY] OTP for ${user.phone}: ${otp}`);
       } else {
@@ -433,15 +444,29 @@ export const sendOTP = async (req, res) => {
       });
     }
 
-    // Generate random 6-digit OTP (Fixed 123456 for test number 8439993033, random for all other numbers)
-    const otp = cleanPhone === '8439993033' ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate OTP — always 123456 for test number or BYPASS_OTP mode
+    const TEST_NUMBERS = ['8439993033', '8439993031'];
+    const isTestNumber = TEST_NUMBERS.includes(cleanPhone);
+    const bypassOtp = isTestNumber || process.env.BYPASS_OTP === 'true';
+    const otp = bypassOtp ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     user.otp = otp;
     user.otpExpires = otpExpires;
     await user.save();
 
-    console.log(`[OTP GENERATED] OTP for ${cleanPhone}: ${otp} (Channel: ${channel})`);
+    console.log(`[OTP GENERATED] OTP for ${cleanPhone}: ${otp} (Channel: ${channel}) | Bypass: ${bypassOtp}`);
+
+    // ─── BYPASS: Skip SMS/WhatsApp for test number or BYPASS_OTP mode ───
+    if (bypassOtp) {
+      console.log(`[OTP BYPASS] Skipping ${channel.toUpperCase()} gateway for ${cleanPhone}. Use OTP: 123456`);
+      return sendSuccess(res, 200, `OTP sent via ${channel.toUpperCase()}`, {
+        otpRequired: true,
+        phone: cleanPhone,
+        channel,
+        devOtp: '123456'
+      });
+    }
 
     let dispatchSuccess = false;
 

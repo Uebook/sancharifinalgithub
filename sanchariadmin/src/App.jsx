@@ -16,6 +16,7 @@ import PoolPricingConfig from "./Pages/PoolPricingConfig"
 import PlannedCommutesAdmin from "./Pages/PlannedCommutesAdmin"
 import WithdrawalRequests from "./Pages/WithdrawalRequests"
 import FeedbackManagement from "./Pages/FeedbackManagement"
+import PayoutSettings from "./Pages/PayoutSettings"
 
 // Auth Guard Component
 const RequireAuth = ({ children }) => {
@@ -71,6 +72,9 @@ function App() {
 
                 {/* App Feedback & Support */}
                 <Route path='/feedback' element={<FeedbackManagement />} />
+
+                {/* Settings */}
+                <Route path='/settings/payouts' element={<PayoutSettings />} />
 
               </Routes>
             </Layout>

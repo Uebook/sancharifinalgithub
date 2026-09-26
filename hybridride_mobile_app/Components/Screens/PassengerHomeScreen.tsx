@@ -56,6 +56,7 @@ const PassengerHomeScreen = () => {
     const [pickupAddress, setPickupAddress] = useState('');
     const [pickupCoords, setPickupCoords] = useState<[number, number] | null>(null);
     const pickupRef = useRef<GooglePlacesAutocompleteRef>(null);
+    const mapRef = useRef<MapView>(null);
 
     const handleCurrentLocation = async () => {
         try {
@@ -66,11 +67,24 @@ const PassengerHomeScreen = () => {
                 if (pickupRef.current) {
                     pickupRef.current.setAddressText(res.address);
                 }
+                if (mapRef.current) {
+                    mapRef.current.animateToRegion({
+                        latitude: res.latitude,
+                        longitude: res.longitude,
+                        latitudeDelta: 0.015,
+                        longitudeDelta: 0.0121,
+                    }, 800);
+                }
             }
         } catch (error: any) {
             Alert.alert("Location Issue", error.message || "Could not fetch location.");
         }
     };
+
+    // Auto-detect user current location on screen mount
+    React.useEffect(() => {
+        handleCurrentLocation();
+    }, []);
 
     // Auto-resume active ride logic
     useFocusEffect(
@@ -144,6 +158,7 @@ const PassengerHomeScreen = () => {
         <View style={styles.container}>
             {/* Real Google Map Background */}
             <MapView
+                ref={mapRef}
                 provider={PROVIDER_GOOGLE}
                 style={styles.mapBackground}
                 zoomEnabled={true}
@@ -153,19 +168,19 @@ const PassengerHomeScreen = () => {
                 zoomTapEnabled={true}
                 minZoomLevel={3}
                 maxZoomLevel={20}
-                initialRegion={{
-                    latitude: pickupCoords ? pickupCoords[1] : 28.6139,
-                    longitude: pickupCoords ? pickupCoords[0] : 77.2090,
+                initialRegion={pickupCoords ? {
+                    latitude: pickupCoords[1],
+                    longitude: pickupCoords[0],
                     latitudeDelta: 0.015,
                     longitudeDelta: 0.0121,
-                }}
+                } : undefined}
                 region={pickupCoords ? {
                     latitude: pickupCoords[1],
                     longitude: pickupCoords[0],
                     latitudeDelta: 0.015,
                     longitudeDelta: 0.0121,
                 } : undefined}
-                showsUserLocation={false}
+                showsUserLocation={true}
                 showsMyLocationButton={false}
             >
                 {pickupCoords && (
@@ -316,7 +331,7 @@ const PassengerHomeScreen = () => {
                             <Text style={styles.trustHeader}>TRUST SCORE NEARBY</Text>
                             <View style={styles.trustRow}>
                                 <FontAwesomeIcon icon={faUser} size={12} color="#F59E0B" style={{ marginRight: 8 }} />
-                                <Text style={styles.trustText}>Drivers nearby rated 4.8★+</Text>
+                                <Text style={styles.trustText}>Partners nearby rated 4.8★+</Text>
                             </View>
                             <View style={styles.trustRow}>
                                 <FontAwesomeIcon icon={faShieldHalved} size={12} color="#F59E0B" style={{ marginRight: 8 }} />
@@ -337,7 +352,7 @@ const PassengerHomeScreen = () => {
                 </View>
 
                 {/* Bottom Navigation */}
-                <BottomNavBar activeTab="HOME" />
+                <BottomNavBar activeTab="RIDES" />
 
                 {/* Emergency SOS Modal */}
                 <SosModal visible={sosVisible} onClose={() => setSosVisible(false)} currentLocation={pickupAddress} />

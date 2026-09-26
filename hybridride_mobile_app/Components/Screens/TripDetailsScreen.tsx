@@ -88,12 +88,13 @@ const TripDetailsScreen = () => {
                         ref={mapRef}
                         provider={PROVIDER_GOOGLE}
                         style={StyleSheet.absoluteFillObject}
-                        initialRegion={{
-                            latitude: pickupCoords ? pickupCoords[1] : 28.6139,
-                            longitude: pickupCoords ? pickupCoords[0] : 77.2090,
+                        showsUserLocation={true}
+                        initialRegion={pickupCoords ? {
+                            latitude: pickupCoords[1],
+                            longitude: pickupCoords[0],
                             latitudeDelta: 0.05,
                             longitudeDelta: 0.05,
-                        }}
+                        } : undefined}
                         scrollEnabled={true}
                         zoomEnabled={true}
                         pitchEnabled={true}

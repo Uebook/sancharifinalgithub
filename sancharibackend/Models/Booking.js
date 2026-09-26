@@ -112,6 +112,8 @@ const bookingSchema = new mongoose.Schema(
 
 // Index for geospatial queries on pickup (to find nearby rides)
 bookingSchema.index({ 'pickup.coordinates': '2dsphere' });
+bookingSchema.index({ driver: 1, status: 1 });
+bookingSchema.index({ passenger: 1, status: 1 });
 
 const Booking = mongoose.model('Booking', bookingSchema);
 export default Booking;

@@ -6,7 +6,8 @@ import Withdrawal from '../Models/Withdrawal.js';
 import PromotedRoute from '../Models/PromotedRoute.js';
 import Offer from '../Models/Offer.js';
 import DriverOffer from '../Models/DriverOffer.js';
-import { processUploadedFile } from '../Utils/uploadHelper.js';
+import SystemSetting from '../Models/SystemSetting.js';
+import { getCashfreePayoutConfig, testCashfreePayoutConnection, executeCashfreeTransfer } from '../Utils/cashfreePayoutService.js';
 // Get list of drivers (with filter for pending/verified)
 export const getDrivers = async (req, res) => {
     try {
@@ -22,12 +23,35 @@ export const getDrivers = async (req, res) => {
             query['driverApprovalStatus'] = 'rejected';
         }
 
-        const drivers = await User.find(query).select('-password').lean();
+        const drivers = await User.find(query).select('-password').sort({ createdAt: -1 }).lean();
+        const driverIds = drivers.map(d => d._id);
 
-        const enrichedDrivers = await Promise.all(drivers.map(async (d) => {
-            const bookingCount = await Booking.countDocuments({ driver: d._id, status: { $ne: 'cancelled' } });
-            const rideHostCount = await Ride.countDocuments({ host: d._id, status: { $ne: 'cancelled' } });
-            const totalRides = bookingCount + rideHostCount;
+        let bookingCountMap = {};
+        let rideCountMap = {};
+
+        if (driverIds.length > 0) {
+            const [bookingCounts, rideCounts] = await Promise.all([
+                Booking.aggregate([
+                    { $match: { driver: { $in: driverIds }, status: { $ne: 'cancelled' } } },
+                    { $group: { _id: '$driver', count: { $sum: 1 } } }
+                ]),
+                Ride.aggregate([
+                    { $match: { host: { $in: driverIds }, status: { $ne: 'cancelled' } } },
+                    { $group: { _id: '$host', count: { $sum: 1 } } }
+                ])
+            ]);
+
+            bookingCounts.forEach(b => {
+                bookingCountMap[b._id.toString()] = b.count;
+            });
+            rideCounts.forEach(r => {
+                rideCountMap[r._id.toString()] = r.count;
+            });
+        }
+
+        const enrichedDrivers = drivers.map((d) => {
+            const idStr = d._id.toString();
+            const totalRides = (bookingCountMap[idStr] || 0) + (rideCountMap[idStr] || 0);
 
             return {
                 ...d,
@@ -37,7 +61,7 @@ export const getDrivers = async (req, res) => {
                     totalRides: totalRides
                 }
             };
-        }));
+        });
 
         console.log(`Found ${drivers.length} drivers.`);
         res.json({ success: true, count: enrichedDrivers.length, data: enrichedDrivers });
@@ -229,17 +253,42 @@ export const getPassengers = async (req, res) => {
         console.log(`Admin ${req.user.email} fetching passengers...`);
         const passengers = await User.find({
             role: { $regex: /^passenger$/i }
-        }).select('-password').lean();
+        }).select('-password').sort({ createdAt: -1 }).lean();
+        const passengerIds = passengers.map(p => p._id);
 
-        const enrichedPassengers = await Promise.all(passengers.map(async (p) => {
-            const bookingCount = await Booking.countDocuments({ passenger: p._id, status: { $ne: 'cancelled' } });
-            const ridePassCount = await Ride.countDocuments({ 'passengers.user': p._id, status: { $ne: 'cancelled' } });
-            const totalRides = bookingCount + ridePassCount;
+        let bookingCountMap = {};
+        let rideCountMap = {};
+
+        if (passengerIds.length > 0) {
+            const [bookingCounts, rideCounts] = await Promise.all([
+                Booking.aggregate([
+                    { $match: { passenger: { $in: passengerIds }, status: { $ne: 'cancelled' } } },
+                    { $group: { _id: '$passenger', count: { $sum: 1 } } }
+                ]),
+                Ride.aggregate([
+                    { $match: { 'passengers.user': { $in: passengerIds }, status: { $ne: 'cancelled' } } },
+                    { $unwind: '$passengers' },
+                    { $match: { 'passengers.user': { $in: passengerIds } } },
+                    { $group: { _id: '$passengers.user', count: { $sum: 1 } } }
+                ])
+            ]);
+
+            bookingCounts.forEach(b => {
+                bookingCountMap[b._id.toString()] = b.count;
+            });
+            rideCounts.forEach(r => {
+                rideCountMap[r._id.toString()] = r.count;
+            });
+        }
+
+        const enrichedPassengers = passengers.map((p) => {
+            const idStr = p._id.toString();
+            const totalRides = (bookingCountMap[idStr] || 0) + (rideCountMap[idStr] || 0);
             return {
                 ...p,
                 totalRides: totalRides
             };
-        }));
+        });
 
         console.log(`Found ${passengers.length} passengers.`);
         res.json({ success: true, count: enrichedPassengers.length, data: enrichedPassengers });
@@ -1284,5 +1333,237 @@ export const deleteDriverOffer = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+// ==========================================
+// CASHFREE PAYOUT SETTINGS & DIRECT TRANSFER
+// ==========================================
+
+// @desc    Get Cashfree Payout settings (Mask secret key in response)
+// @route   GET /api/admin/settings/payout
+export const getPayoutSettings = async (req, res) => {
+    try {
+        const config = await getCashfreePayoutConfig();
+        // Mask clientSecret for security
+        const maskedSecret = config.clientSecret
+            ? config.clientSecret.length > 8
+                ? config.clientSecret.slice(0, 4) + '••••••••' + config.clientSecret.slice(-4)
+                : '••••••••'
+            : '';
+
+        res.json({
+            success: true,
+            data: {
+                clientId: config.clientId,
+                clientSecret: maskedSecret,
+                hasSecret: Boolean(config.clientSecret),
+                environment: config.environment,
+                isEnabled: config.isEnabled,
+                transferModePreference: config.transferModePreference
+            }
+        });
+    } catch (error) {
+        console.error('getPayoutSettings error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch payout settings' });
+    }
+};
+
+// @desc    Update Cashfree Payout settings in DB
+// @route   PUT /api/admin/settings/payout
+export const updatePayoutSettings = async (req, res) => {
+    try {
+        const { clientId, clientSecret, environment, isEnabled, transferModePreference } = req.body;
+
+        const currentConfig = await getCashfreePayoutConfig();
+
+        // If clientSecret is masked or untouched, retain existing secret
+        let newSecret = currentConfig.clientSecret;
+        if (clientSecret && !clientSecret.includes('••••')) {
+            newSecret = clientSecret.trim();
+        }
+
+        const env = (environment || 'SANDBOX').trim().toUpperCase();
+
+        // STRICT CHECK: Reject placeholder keys in PRODUCTION
+        if (env === 'PRODUCTION' || env === 'PROD') {
+            const lowerId = (clientId || '').toLowerCase();
+            const lowerSec = (newSecret || '').toLowerCase();
+            if (
+                !clientId ||
+                !newSecret ||
+                lowerId.includes('dummy') ||
+                lowerId.includes('placeholder') ||
+                lowerId.includes('your_') ||
+                lowerSec.includes('dummy') ||
+                lowerSec.includes('placeholder') ||
+                lowerSec.includes('your_')
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Live Production mode requires valid Cashfree Payout Client ID & Secret Key. Placeholders are strictly prohibited.'
+                });
+            }
+        }
+
+        const updatedValue = {
+            clientId: (clientId || '').trim(),
+            clientSecret: newSecret,
+            environment: env,
+            isEnabled: isEnabled !== false,
+            transferModePreference: transferModePreference || 'auto'
+        };
+
+        await SystemSetting.findOneAndUpdate(
+            { key: 'cashfree_payout_config' },
+            {
+                key: 'cashfree_payout_config',
+                value: updatedValue,
+                description: 'Cashfree Payout credentials and environment configuration'
+            },
+            { upsert: true, new: true }
+        );
+
+        res.json({
+            success: true,
+            message: `Payout configuration successfully saved in database (${env} mode)`,
+            data: {
+                clientId: updatedValue.clientId,
+                environment: updatedValue.environment,
+                isEnabled: updatedValue.isEnabled,
+                transferModePreference: updatedValue.transferModePreference
+            }
+        });
+    } catch (error) {
+        console.error('updatePayoutSettings error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update payout settings' });
+    }
+};
+
+// @desc    Test connection with Cashfree Payout API using saved or provided credentials
+// @route   POST /api/admin/settings/payout/test-connection
+export const testPayoutConnection = async (req, res) => {
+    try {
+        const { clientId, clientSecret, environment } = req.body || {};
+
+        let testCreds = null;
+        if (clientId && clientSecret && !clientSecret.includes('••••')) {
+            testCreds = {
+                clientId: clientId.trim(),
+                clientSecret: clientSecret.trim(),
+                environment: (environment || 'SANDBOX').trim().toUpperCase()
+            };
+        }
+
+        const result = await testCashfreePayoutConnection(testCreds);
+        res.json(result);
+    } catch (error) {
+        console.error('testPayoutConnection error:', error);
+        res.status(400).json({
+            success: false,
+            message: error.message || 'Connection test failed'
+        });
+    }
+};
+
+// @desc    Process Instant Driver Payout via Cashfree
+// @route   POST /api/admin/withdrawals/:id/payout
+export const processCashfreeWithdrawalPayout = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const withdrawal = await Withdrawal.findById(id).populate('driver');
+
+        if (!withdrawal) {
+            return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
+        }
+
+        if (withdrawal.status === 'completed') {
+            return res.status(400).json({ success: false, message: 'Withdrawal is already completed' });
+        }
+
+        if (withdrawal.status === 'rejected') {
+            return res.status(400).json({ success: false, message: 'Withdrawal was rejected. Create a new request.' });
+        }
+
+        const driver = await User.findById(withdrawal.driver._id);
+        if (!driver) {
+            return res.status(404).json({ success: false, message: 'Driver account not found' });
+        }
+
+        if (driver.walletBalance < withdrawal.amount) {
+            return res.status(400).json({
+                success: false,
+                message: `Insufficient driver wallet balance (Current: ₹${driver.walletBalance}, Requested: ₹${withdrawal.amount})`
+            });
+        }
+
+        // Get bank or UPI details
+        const bank = withdrawal.bankDetails?.accountNumber
+            ? withdrawal.bankDetails
+            : driver.driverDetails?.bankDetails;
+
+        const upiId = withdrawal.bankDetails?.upiId || driver.driverDetails?.bankDetails?.upiId || '';
+
+        if ((!bank || !bank.accountNumber || !bank.ifscCode) && !upiId) {
+            return res.status(400).json({
+                success: false,
+                message: 'No valid Bank Account or UPI ID configured for this driver. Please check driver bank details.'
+            });
+        }
+
+        // Execute Cashfree Transfer
+        const transferResult = await executeCashfreeTransfer({
+            transferId: withdrawal._id,
+            amount: withdrawal.amount,
+            phone: driver.phone,
+            name: bank?.accountHolderName || driver.name,
+            email: driver.email,
+            bankAccount: bank?.accountNumber || '',
+            ifsc: bank?.ifscCode || '',
+            upiId: upiId,
+            remarks: `Sanchari Payout #${withdrawal._id.toString().slice(-6).toUpperCase()}`
+        });
+
+        // Deduct Driver Balance
+        driver.walletBalance -= withdrawal.amount;
+        await driver.save();
+
+        // Update Wallet Ledger
+        let wallet = await Wallet.findOne({ user: driver._id });
+        if (!wallet) {
+            wallet = await Wallet.create({ user: driver._id, balance: driver.walletBalance });
+        }
+        wallet.balance = driver.walletBalance;
+        wallet.transactions.push({
+            type: 'debit',
+            amount: withdrawal.amount,
+            description: `Cashfree Payout Disbursed (${transferResult.transferMode.toUpperCase()}) - UTR: ${transferResult.utr}`,
+            referenceId: withdrawal._id
+        });
+        await wallet.save();
+
+        // Update Withdrawal record
+        withdrawal.status = 'completed';
+        withdrawal.transactionId = transferResult.utr;
+        withdrawal.processedAt = new Date();
+        withdrawal.remark = `Settled via Cashfree Payout (${transferResult.environment}) - UTR: ${transferResult.utr}`;
+        await withdrawal.save();
+
+        res.json({
+            success: true,
+            message: `Payout successfully processed! UTR: ${transferResult.utr}`,
+            data: {
+                withdrawal,
+                utr: transferResult.utr,
+                transferMode: transferResult.transferMode,
+                environment: transferResult.environment
+            }
+        });
+    } catch (error) {
+        console.error('processCashfreeWithdrawalPayout error:', error);
+        res.status(400).json({
+            success: false,
+            message: error.message || 'Failed to process Cashfree payout'
+        });
     }
 };

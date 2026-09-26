@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -21,6 +21,7 @@ import { faCamera, faHome, faBriefcase, faPlus, faArrowLeft } from '@fortawesome
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useAuth } from '../Context/AuthContext';
 import { driverService } from '../../Services/driverService';
+import { driverOnboardingStorage } from '../../Services/driverOnboardingStorage';
 
 const { width } = Dimensions.get('window');
 
@@ -52,6 +53,26 @@ const ProfileSetupScreen = ({ route }: any) => {
     const [isEditingPhone, setIsEditingPhone] = useState(!(userData?.phone || phoneNumber));
     const [profileImage, setProfileImage] = useState<string | null>(userData?.profileImage || googleData?.picture || null);
     const [errors, setErrors] = useState({});
+
+    useEffect(() => {
+        if (isDriver) {
+            const loadDraft = async () => {
+                const draft = await driverOnboardingStorage.getDraft();
+                if (draft?.userData) {
+                    const u = draft.userData;
+                    if (!fullName && u.name) setFullName(u.name);
+                    if (!email && u.email) setEmail(u.email);
+                    if (!password && u.password) setPassword(u.password);
+                    if (!phone && u.phone) {
+                        setPhone(u.phone);
+                        setIsEditingPhone(false);
+                    }
+                    if (!profileImage && u.profileImage) setProfileImage(u.profileImage);
+                }
+            };
+            loadDraft();
+        }
+    }, [isDriver]);
 
     const validateForm = () => {
         const newErrors: any = {};
@@ -121,10 +142,25 @@ const ProfileSetupScreen = ({ route }: any) => {
         console.log("DEBUG: handleSave called. isDriver:", isDriver, "userType:", userType, "userDataRole:", userData?.role);
 
         if (isDriver) {
+            const updatedUserData = {
+                ...route.params?.userData,
+                name: trimmedName,
+                email: trimmedEmail,
+                phone: trimmedPhone,
+                password: trimmedPassword,
+                role: 'driver',
+                profileImage,
+                googleIdToken: googleData?.idToken
+            };
+
+            await driverOnboardingStorage.saveDraft({
+                userData: updatedUserData
+            });
+
             // Pass data to next screen for drivers
             console.log("Navigating to DriverVehicleSelection with googleIdToken:", !!googleData?.idToken);
             (navigation as any).navigate('DriverVehicleSelection', {
-                userData: { ...route.params?.userData, name: trimmedName, email: trimmedEmail, phone: trimmedPhone, password: trimmedPassword, role: 'driver', profileImage, googleIdToken: googleData?.idToken } // Pass image URI & Google token
+                userData: updatedUserData
             });
         } else {
             try {

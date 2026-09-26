@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -8,10 +7,10 @@ import {
     Image,
     Alert,
     ScrollView,
+    BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
     faArrowLeft,
@@ -19,36 +18,16 @@ import {
     faCircleInfo
 } from '@fortawesome/free-solid-svg-icons';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { driverOnboardingStorage } from '../../Services/driverOnboardingStorage';
 
 const DriverDocumentUploadScreen = () => {
     const navigation = useNavigation();
     const route = useRoute();
-    const { documentName = 'Document', description = 'Upload a clear photo.', enableDigiLocker = false, existingDocs = [], vehicleType = 'CAR', userData } = route.params as any || {};
+    const { documentName = 'Document', description = 'Upload a clear photo.', enableDigiLocker = false, existingDocs = [], vehicleType = 'CAR', userData, capturedDocs = {} } = route.params as any || {};
     const isReupload = route.name === 'ReuploadDocumentUpload';
     const targetScreen = isReupload ? 'ReuploadRegistration' : 'DriverRegistration';
 
     const [activeTab, setActiveTab] = useState<'MANUAL' | 'DIGILOCKER'>('MANUAL');
-    const [frontImage, setFrontImage] = useState<string | null>(null);
-    const [backImage, setBackImage] = useState<string | null>(null);
-
-    const isBothSidesRequired = documentName.toLowerCase().includes('aadhaar') || documentName.toLowerCase().includes('license');
-    const isSubmitEnabled = isBothSidesRequired ? (!!frontImage && !!backImage) : !!frontImage;
-
-
-    const handleImagePick = async (side: 'FRONT' | 'BACK') => {
-        const result = await launchImageLibrary({
-            mediaType: 'photo',
-            quality: 0.8,
-        });
-
-        if (result.assets && result.assets.length > 0) {
-            const uri = result.assets[0].uri;
-            if (uri) {
-                if (side === 'FRONT') setFrontImage(uri);
-                else setBackImage(uri);
-            }
-        }
-    };
 
     const getDocTypeKey = (uiName: string, side: 'FRONT' | 'BACK') => {
         const lowerName = uiName.toLowerCase();
@@ -65,16 +44,80 @@ const DriverDocumentUploadScreen = () => {
         return 'other';
     };
 
-    // uploadFile function removed as we are deferring upload
+    const frontDocTypeKey = getDocTypeKey(documentName, 'FRONT');
+    const backDocTypeKey = getDocTypeKey(documentName, 'BACK');
 
-    const handleBack = () => {
-        // Collect current images but DON'T mark as complete
-        const frontDocType = getDocTypeKey(documentName, 'FRONT');
-        const backDocType = backImage ? getDocTypeKey(documentName, 'BACK') : null;
+    const [frontImage, setFrontImage] = useState<string | null>(capturedDocs[frontDocTypeKey] || null);
+    const [backImage, setBackImage] = useState<string | null>(capturedDocs[backDocTypeKey] || null);
 
+    useEffect(() => {
+        const loadInitialDraft = async () => {
+            const draft = await driverOnboardingStorage.getDraft();
+            if (draft?.capturedDocs) {
+                if (!frontImage && draft.capturedDocs[frontDocTypeKey]) {
+                    setFrontImage(draft.capturedDocs[frontDocTypeKey]);
+                }
+                if (!backImage && draft.capturedDocs[backDocTypeKey]) {
+                    setBackImage(draft.capturedDocs[backDocTypeKey]);
+                }
+            }
+        };
+        loadInitialDraft();
+    }, [frontDocTypeKey, backDocTypeKey]);
+
+    const isBothSidesRequired = documentName.toLowerCase().includes('aadhaar') || documentName.toLowerCase().includes('license');
+    const isSubmitEnabled = isBothSidesRequired ? (!!frontImage && !!backImage) : !!frontImage;
+
+    const handleImagePick = async (side: 'FRONT' | 'BACK') => {
+        const result = await launchImageLibrary({
+            mediaType: 'photo',
+            quality: 0.8,
+        });
+
+        if (result.assets && result.assets.length > 0) {
+            const uri = result.assets[0].uri;
+            if (uri) {
+                let updatedFront = frontImage;
+                let updatedBack = backImage;
+
+                if (side === 'FRONT') {
+                    setFrontImage(uri);
+                    updatedFront = uri;
+                } else {
+                    setBackImage(uri);
+                    updatedBack = uri;
+                }
+
+                // Auto-save immediately to AsyncStorage
+                const newDocs: Record<string, string> = {};
+                if (updatedFront) newDocs[frontDocTypeKey] = updatedFront;
+                if (updatedBack && isBothSidesRequired) newDocs[backDocTypeKey] = updatedBack;
+
+                const finalCapturedDocs = {
+                    ...capturedDocs,
+                    ...newDocs
+                };
+
+                const isComplete = isBothSidesRequired ? (!!updatedFront && !!updatedBack) : !!updatedFront;
+                let currentDocs = [...existingDocs];
+                if (isComplete && !currentDocs.includes(documentName)) {
+                    currentDocs.push(documentName);
+                }
+
+                driverOnboardingStorage.saveDraft({
+                    capturedDocs: finalCapturedDocs,
+                    uploadedDocuments: currentDocs,
+                    userData,
+                    vehicleType
+                });
+            }
+        }
+    };
+
+    const handleBack = React.useCallback(async () => {
         const newDocs: Record<string, string> = {};
-        if (frontImage) newDocs[frontDocType] = frontImage;
-        if (backImage && backDocType) newDocs[backDocType] = backImage;
+        if (frontImage) newDocs[frontDocTypeKey] = frontImage;
+        if (backImage && isBothSidesRequired) newDocs[backDocTypeKey] = backImage;
 
         const existingCapturedDocs = (route.params as any)?.capturedDocs || {};
         const finalCapturedDocs = {
@@ -82,27 +125,48 @@ const DriverDocumentUploadScreen = () => {
             ...newDocs
         };
 
+        let currentDocs = [...existingDocs];
+        const isNowComplete = isBothSidesRequired ? (!!frontImage && !!backImage) : !!frontImage;
+        if (isNowComplete && !currentDocs.includes(documentName)) {
+            currentDocs.push(documentName);
+        }
+
+        await driverOnboardingStorage.saveDraft({
+            capturedDocs: finalCapturedDocs,
+            uploadedDocuments: currentDocs,
+            userData,
+            vehicleType
+        });
+
         (navigation as any).navigate(targetScreen, {
             userData,
             vehicleType,
-            capturedDocs: finalCapturedDocs
+            capturedDocs: finalCapturedDocs,
+            updatedDocList: currentDocs
         });
-    };
+        return true;
+    }, [navigation, frontImage, backImage, frontDocTypeKey, backDocTypeKey, isBothSidesRequired, route.params, existingDocs, documentName, userData, vehicleType, targetScreen]);
 
+    useFocusEffect(
+        React.useCallback(() => {
+            const onBackPress = () => {
+                handleBack();
+                return true;
+            };
+            const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+            return () => subscription.remove();
+        }, [handleBack])
+    );
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!frontImage) return;
 
-        // Identify docTypes
-        const frontDocType = getDocTypeKey(documentName, 'FRONT');
-        const backDocType = backImage ? getDocTypeKey(documentName, 'BACK') : null;
-
-        const newDocs = {
-            [frontDocType]: frontImage,
+        const newDocs: Record<string, string> = {
+            [frontDocTypeKey]: frontImage,
         };
 
-        if (backImage && backDocType) {
-            newDocs[backDocType] = backImage;
+        if (backImage && isBothSidesRequired) {
+            newDocs[backDocTypeKey] = backImage;
         }
 
         // Merge with existing docs passed from previous screen
@@ -113,9 +177,16 @@ const DriverDocumentUploadScreen = () => {
             ...newDocs
         };
 
-        Alert.alert("Success", "Document saved pending registration!");
-
         const updatedList = Array.from(new Set([...existingDocs, documentName]));
+
+        await driverOnboardingStorage.saveDraft({
+            capturedDocs: finalCapturedDocs,
+            uploadedDocuments: updatedList,
+            userData,
+            vehicleType
+        });
+
+        Alert.alert("Success", "Document saved pending registration!");
 
         (navigation as any).navigate(targetScreen, {
             completedDocument: documentName,

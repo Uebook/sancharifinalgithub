@@ -3,9 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { authService } from '../../Services/authService';
 
-GoogleSignin.configure({
-    webClientId: '909296510785-e3a279afthh5br10j180ie4lidh9ucp2.apps.googleusercontent.com',
-});
+try {
+    GoogleSignin.configure({
+        webClientId: '909296510785-e3a279afthh5br10j180ie4lidh9ucp2.apps.googleusercontent.com',
+        iosClientId: '909296510785-e3a279afthh5br10j180ie4lidh9ucp2.apps.googleusercontent.com',
+    });
+} catch (error) {
+    console.warn('[GoogleSignin] configure error:', error);
+}
 interface User {
     _id: string;
     name: string;

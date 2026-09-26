@@ -5,7 +5,7 @@ import {
     LayoutDashboard, Users, UserCog, ShieldCheck, CreditCard,
     Gift, MapPin, Activity, List, Calendar, Tag, Banknote,
     CalendarCheck, Wallet, FileText, Bike, LogOut, X, Sparkles,
-    ChevronRight, Layers, MessageSquare
+    ChevronRight, Layers, MessageSquare, Zap
 } from 'lucide-react';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
@@ -67,6 +67,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             titleColor: 'text-rose-400',
             items: [
                 { id: 'withdrawals', title: 'Withdrawal Requests', path: '/payments/withdrawals', icon: CreditCard },
+                { id: 'payout-settings', title: 'Payout Settings (Cashfree)', path: '/settings/payouts', icon: Zap },
                 { id: 'driver-wallets', title: 'Partner Wallets', path: '/payments/wallets/drivers', icon: Wallet },
                 { id: 'passenger-wallets', title: 'Customer Wallets', path: '/payments/wallets/passengers', icon: Wallet },
                 { id: 'transactions', title: 'Financial Transactions', path: '/payments/transactions', icon: FileText }

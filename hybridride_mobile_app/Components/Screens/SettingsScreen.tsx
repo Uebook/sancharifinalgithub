@@ -125,7 +125,7 @@ const SettingsScreen = () => {
                         <View style={[styles.dividerFull, isDriver && { backgroundColor: '#1E293B' }]} />
                         <TouchableOpacity
                             style={styles.simpleRow}
-                            onPress={() => Linking.openURL('https://sanchari.io/?view=customer-terms')}
+                            onPress={() => Linking.openURL(isDriver ? 'https://sanchari.io/?view=partner-terms' : 'https://sanchari.io/?view=customer-terms')}
                             activeOpacity={0.7}
                         >
                             <Text style={[styles.simpleRowText, isDriver && styles.darkText]}>Terms of Service</Text>
