@@ -484,10 +484,10 @@ const WithdrawalRequests = () => {
 
                 <Pagination
                     currentPage={currentPage}
-                    totalEntries={filteredWithdrawals.length}
-                    limit={limit}
+                    totalItems={filteredWithdrawals.length}
+                    itemsPerPage={limit}
                     onPageChange={setCurrentPage}
-                    onLimitChange={(l) => { setLimit(l); setCurrentPage(1); }}
+                    onItemsPerPageChange={(l) => { setLimit(l); setCurrentPage(1); }}
                 />
             </div>
 
