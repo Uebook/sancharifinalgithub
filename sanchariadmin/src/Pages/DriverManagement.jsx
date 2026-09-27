@@ -266,6 +266,7 @@ const DriverManagement = ({ view = 'directory' }) => {
             if (res.data.success) {
                 const mappedPartners = res.data.data.map(d => ({
                     id: d._id,
+                    applicationId: d.applicationId || (d._id ? `SAN-D-${d._id.slice(-6).toUpperCase()}` : 'Pending'),
                     name: d.name,
                     phone: d.phone || 'N/A',
                     email: d.email || 'N/A',
@@ -390,6 +391,7 @@ const DriverManagement = ({ view = 'directory' }) => {
         const matchesSearch = (d.name || '').toLowerCase().includes(query) ||
             (d.phone || '').includes(searchQuery) ||
             (d.email || '').toLowerCase().includes(query) ||
+            (d.applicationId || '').toLowerCase().includes(query) ||
             (d.plateNumber || '').toLowerCase().includes(query) ||
             (d.licenseNumber || '').toLowerCase().includes(query) ||
             (d.id || '').toLowerCase().includes(query);
@@ -526,9 +528,10 @@ const DriverManagement = ({ view = 'directory' }) => {
     };
 
     const exportCSV = () => {
-        const headers = ['S.No,Partner ID,Name,Phone,Email,Status,Vehicle Make,Vehicle Model,Vehicle Type,Plate Number,License Number,Rating,Total Earnings (INR),Join Date'];
+        const headers = ['S.No,Application ID,Partner ID,Name,Phone,Email,Status,Vehicle Make,Vehicle Model,Vehicle Type,Plate Number,License Number,Rating,Total Earnings (INR),Join Date'];
         const rows = sortedPartners.map((p, idx) => [
             idx + 1,
+            `"${p.applicationId || 'N/A'}"`,
             `"${p.id}"`,
             `"${p.name || ''}"`,
             `"${p.phone || ''}"`,
@@ -601,6 +604,11 @@ const DriverManagement = ({ view = 'directory' }) => {
                                     </div>
 
                                     <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                        {d.applicationId && (
+                                            <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow-sm">
+                                                App ID: {d.applicationId}
+                                            </span>
+                                        )}
                                         <StatusBadge status={d.status} />
                                         
                                         {/* Online & Availability Badges */}
@@ -616,8 +624,13 @@ const DriverManagement = ({ view = 'directory' }) => {
                                         <span className="text-xs text-slate-400">• Joined {d.joinDate}</span>
                                     </div>
                                     
-                                    <div className="text-xs font-mono text-slate-400 mt-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 w-fit">
-                                        Partner ID: <span className="text-slate-200 font-bold">{d.id}</span>
+                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                        <div className="text-xs font-mono text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 w-fit">
+                                            Application ID: <span className="text-emerald-400 font-bold">{d.applicationId || 'N/A'}</span>
+                                        </div>
+                                        <div className="text-xs font-mono text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 w-fit">
+                                            Partner ID: <span className="text-slate-200 font-bold">{d.id}</span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1038,6 +1051,11 @@ const DriverManagement = ({ view = 'directory' }) => {
                                                         <div className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors flex items-center gap-2">
                                                             {driver.name}
                                                             {driver.vehicleType === 'BIKE' ? <Bike size={14} className="text-sky-400" /> : <Car size={14} className="text-emerald-400" />}
+                                                            {driver.applicationId && (
+                                                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-950/70 text-emerald-400 border border-emerald-500/30">
+                                                                    {driver.applicationId}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <div className="text-xs text-slate-400">Rating: {driver.rating} ⭐ ({driver.totalRides} Rides)</div>
                                                     </div>
@@ -1151,7 +1169,16 @@ const DriverManagement = ({ view = 'directory' }) => {
                                                     <div className="h-10 w-10 rounded-full border border-slate-700 overflow-hidden bg-slate-800">
                                                         <img src={applicant.avatar} alt={applicant.name} className="w-full h-full object-cover" />
                                                     </div>
-                                                    <div className="text-sm font-semibold text-white">{applicant.name}</div>
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-white flex items-center gap-2">
+                                                            {applicant.name}
+                                                            {applicant.applicationId && (
+                                                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-950/70 text-emerald-400 border border-emerald-500/30">
+                                                                    {applicant.applicationId}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
@@ -1269,8 +1296,13 @@ const DriverManagement = ({ view = 'directory' }) => {
                                     />
                                 </div>
                                 <div>
-                                    <div className="flex items-center gap-2.5">
+                                    <div className="flex items-center gap-2.5 flex-wrap">
                                         <h4 className="text-lg font-bold text-white">{selectedApplicant.name}</h4>
+                                        {selectedApplicant.applicationId && (
+                                            <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                                App ID: {selectedApplicant.applicationId}
+                                            </span>
+                                        )}
                                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
                                             selectedApplicant.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                                             selectedApplicant.status === 'rejected' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :

@@ -79,6 +79,7 @@ const PassengerManagement = ({ view = 'directory' }) => {
             if (res.data.success) {
                 const formatted = res.data.data.map(p => ({
                     id: p._id,
+                    applicationId: p.applicationId || (p._id ? `SAN-P-${p._id.slice(-6).toUpperCase()}` : 'N/A'),
                     name: p.name || '',
                     phone: p.phone || '',
                     email: p.email || '',
@@ -126,6 +127,7 @@ const PassengerManagement = ({ view = 'directory' }) => {
         const matchesSearch = (p.name || '').toLowerCase().includes(query) ||
             (p.phone || '').includes(searchQuery) ||
             (p.email || '').toLowerCase().includes(query) ||
+            (p.applicationId || '').toLowerCase().includes(query) ||
             (p.id || '').toLowerCase().includes(query);
         const matchesStatus = filterStatus === 'all' || p.status === filterStatus;
         return matchesSearch && matchesStatus;
@@ -218,9 +220,10 @@ const PassengerManagement = ({ view = 'directory' }) => {
     };
 
     const exportCSV = () => {
-        const headers = ['S.No,Customer ID,Name,Email,Phone,Status,Join Date,Total Rides,Wallet Balance (INR)'];
+        const headers = ['S.No,Application ID,Customer ID,Name,Email,Phone,Status,Join Date,Total Rides,Wallet Balance (INR)'];
         const rows = sortedPassengers.map((p, idx) => [
             idx + 1,
+            `"${p.applicationId || 'N/A'}"`,
             `"${p.id}"`,
             `"${p.name || ''}"`,
             `"${p.email || ''}"`,
@@ -312,11 +315,16 @@ const PassengerManagement = ({ view = 'directory' }) => {
                         <div className="flex-1 space-y-4 w-full">
                             <div className="flex justify-between items-start flex-wrap gap-4">
                                 <div>
-                                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                                    <h2 className="text-2xl font-bold text-white flex items-center gap-2 flex-wrap">
                                         {p.name}
                                         <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono uppercase">
                                             {p.role}
                                         </span>
+                                        {p.applicationId && (
+                                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono font-bold">
+                                                App ID: {p.applicationId}
+                                            </span>
+                                        )}
                                     </h2>
                                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                                         <StatusBadge status={p.status} />
@@ -342,7 +350,9 @@ const PassengerManagement = ({ view = 'directory' }) => {
                             <User size={16} className="text-sky-400" /> Core Identity & Contact
                         </h3>
                         <div className="space-y-2 text-xs divide-y divide-slate-800/60">
-                            <div className="pt-1 flex justify-between"><span className="text-slate-400">Full Name:</span> <span className="text-slate-200 font-semibold">{p.name}</span></div>
+                            <div className="pt-1 flex justify-between"><span className="text-slate-400">Application ID:</span> <span className="text-emerald-400 font-mono font-bold">{p.applicationId || 'N/A'}</span></div>
+                            <div className="pt-2 flex justify-between"><span className="text-slate-400">Customer ID:</span> <span className="text-slate-400 font-mono">{p.id}</span></div>
+                            <div className="pt-2 flex justify-between"><span className="text-slate-400">Full Name:</span> <span className="text-slate-200 font-semibold">{p.name}</span></div>
                             <div className="pt-2 flex justify-between"><span className="text-slate-400">Email Address:</span> <span className="text-slate-200">{p.email || 'N/A'}</span></div>
                             <div className="pt-2 flex justify-between"><span className="text-slate-400">Phone Number:</span> <span className="text-slate-200 font-semibold">{p.phone || 'N/A'}</span></div>
                             <div className="pt-2 flex justify-between"><span className="text-slate-400">Role:</span> <span className="text-indigo-400 font-bold uppercase">{p.role}</span></div>
@@ -616,7 +626,14 @@ const PassengerManagement = ({ view = 'directory' }) => {
                                                     <img src={passenger.avatar} alt={passenger.name} className="w-full h-full object-cover" />
                                                 </div>
                                                 <div>
-                                                    <div className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors">{passenger.name}</div>
+                                                    <div className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors flex items-center gap-2">
+                                                        {passenger.name}
+                                                        {passenger.applicationId && (
+                                                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-950/70 text-emerald-400 border border-emerald-500/30">
+                                                                {passenger.applicationId}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <div className="text-xs text-slate-400">Rating: {passenger.rating} ⭐</div>
                                                 </div>
                                             </div>

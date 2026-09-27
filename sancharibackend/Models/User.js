@@ -146,6 +146,13 @@ const userSchema = new mongoose.Schema(
     isBlocked: { type: Boolean, default: false },
     rejectionReason: { type: String, default: "" },
 
+    applicationId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+
     walletBalance: { type: Number, default: 0 },
 
     otp: { type: String, default: null },
@@ -153,6 +160,20 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+import { getNextApplicationId } from '../Utils/sequenceGenerator.js';
+
+// Auto-assign unique Application ID on creation if not already set
+userSchema.pre('save', async function (next) {
+  if (!this.applicationId) {
+    try {
+      this.applicationId = await getNextApplicationId(this.role);
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
 
 userSchema.index({ role: 1, driverApprovalStatus: 1, createdAt: -1 });
 userSchema.index({ role: 1, createdAt: -1 });
