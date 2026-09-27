@@ -164,15 +164,14 @@ const userSchema = new mongoose.Schema(
 import { getNextApplicationId } from '../Utils/sequenceGenerator.js';
 
 // Auto-assign unique Application ID on creation if not already set
-userSchema.pre('save', async function (next) {
+userSchema.pre('save', async function () {
   if (!this.applicationId) {
     try {
       this.applicationId = await getNextApplicationId(this.role);
     } catch (err) {
-      return next(err);
+      console.error('Error generating applicationId in pre-save:', err);
     }
   }
-  next();
 });
 
 userSchema.index({ role: 1, driverApprovalStatus: 1, createdAt: -1 });

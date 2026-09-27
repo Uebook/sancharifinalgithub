@@ -146,13 +146,16 @@ export const verifyDriver = async (req, res) => {
 
         if (action === 'approve') {
             driver.driverApprovalStatus = 'approved';
+            driver.isBlocked = false;
             driver.rejectionReason = ""; // Clear rejection reason on approval
             driver.verificationStatus = {
+                ...(driver.verificationStatus || {}),
                 email: true,
                 phone: true,
                 idCard: true,
                 communityTrusted: true
             };
+            if (!driver.driverDetails) driver.driverDetails = {};
             driver.driverDetails.isOnline = false;
             await driver.save();
             return res.json({ success: true, message: 'Driver approved successfully', data: driver });
@@ -161,6 +164,7 @@ export const verifyDriver = async (req, res) => {
             const { rejectionReason } = req.body;
             driver.driverApprovalStatus = 'rejected';
             driver.rejectionReason = rejectionReason || "Your documents did not meet our requirements.";
+            if (!driver.verificationStatus) driver.verificationStatus = {};
             driver.verificationStatus.communityTrusted = false;
             driver.verificationStatus.idCard = false;
             await driver.save();
@@ -170,8 +174,8 @@ export const verifyDriver = async (req, res) => {
         }
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Server Error' });
+        console.error('verifyDriver error:', error);
+        res.status(500).json({ success: false, message: error.message || 'Server Error' });
     }
 };
 
