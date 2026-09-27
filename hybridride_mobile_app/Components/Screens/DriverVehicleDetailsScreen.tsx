@@ -90,10 +90,11 @@ const DriverVehicleDetailsScreen = () => {
             userData: updatedUserData,
             vehicleType,
             capturedDocs,
-            updatedDocList: currentDocs
+            updatedDocList: currentDocs,
+            fromProfile: (route.params as any)?.fromProfile
         });
         return true;
-    }, [navigation, make, model, year, plateNumber, color, vehicleType, fuelType, seatingCapacity, bootSpace, userData, existingDocs, capturedDocs, targetScreen]);
+    }, [navigation, make, model, year, plateNumber, color, vehicleType, fuelType, seatingCapacity, bootSpace, userData, existingDocs, capturedDocs, targetScreen, route.params]);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -145,7 +146,8 @@ const DriverVehicleDetailsScreen = () => {
             updatedDocList: updatedList,
             vehicleType,
             userData: updatedUserData,
-            capturedDocs: capturedDocs // Pass back the docs
+            capturedDocs: capturedDocs, // Pass back the docs
+            fromProfile: (route.params as any)?.fromProfile
         });
     };
 

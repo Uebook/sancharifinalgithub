@@ -140,7 +140,8 @@ const DriverDocumentUploadScreen = () => {
             userData,
             vehicleType,
             capturedDocs: finalCapturedDocs,
-            updatedDocList: currentDocs
+            updatedDocList: currentDocs,
+            fromProfile: (route.params as any)?.fromProfile
         });
         return true;
     }, [navigation, frontImage, backImage, frontDocTypeKey, backDocTypeKey, isBothSidesRequired, route.params, existingDocs, documentName, userData, vehicleType, targetScreen]);
@@ -191,7 +192,8 @@ const DriverDocumentUploadScreen = () => {
             updatedDocList: updatedList,
             vehicleType,
             userData,
-            capturedDocs: finalCapturedDocs // Pass the FULL set back
+            capturedDocs: finalCapturedDocs, // Pass the FULL set back
+            fromProfile: (route.params as any)?.fromProfile
         });
     };
 

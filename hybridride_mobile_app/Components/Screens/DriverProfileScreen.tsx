@@ -168,6 +168,7 @@ const DriverProfileScreen = () => {
             vehicleType: user?.driverDetails?.vehicle?.type || 'CAR',
             capturedDocs: user?.driverDetails?.documents || {},
             updatedDocList: Object.keys(user?.driverDetails?.documents || {}),
+            fromProfile: true
         });
     };
 

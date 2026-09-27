@@ -46,8 +46,11 @@ const DriverRegistrationScreen = () => {
         completedDocument?: string,
         updatedDocList?: string[],
         userData?: any,
-        capturedDocs?: Record<string, string>
+        capturedDocs?: Record<string, string>,
+        fromProfile?: boolean
     } || {};
+
+    const fromProfile = !!params.fromProfile || (!!user && user.role === 'driver');
 
     const initialVehicleType = params.vehicleType || user?.driverDetails?.vehicle?.type || 'CAR';
     const initialUserData = params.userData || (user ? {
@@ -127,14 +130,10 @@ const DriverRegistrationScreen = () => {
             vehicleType
         });
 
-        if (isReupload) {
+        if (fromProfile) {
+            (navigation as any).navigate('DriverProfile');
+        } else if (isReupload) {
             (navigation as any).navigate('DriverPendingApproval');
-        } else if (user && user.role === 'driver' && user.driverApprovalStatus === 'approved') {
-            if (navigation.canGoBack()) {
-                navigation.goBack();
-            } else {
-                (navigation as any).navigate('DriverProfile');
-            }
         } else {
             (navigation as any).navigate('DriverVehicleSelection', {
                 userData: mergedUserData,
@@ -144,7 +143,7 @@ const DriverRegistrationScreen = () => {
             });
         }
         return true;
-    }, [navigation, mergedUserData, documentUris, uploadedDocuments, vehicleType, isReupload, user]);
+    }, [navigation, mergedUserData, documentUris, uploadedDocuments, vehicleType, isReupload, fromProfile]);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -460,7 +459,8 @@ const DriverRegistrationScreen = () => {
                     existingDocs: uploadedDocuments,
                     vehicleType,
                     userData: mergedUserData,
-                    capturedDocs: documentUris
+                    capturedDocs: documentUris,
+                    fromProfile
                 }))}
                 {renderStep("PAN Card", "For Tax Compliance (Optional)", faCreditCard, !isIdentityVerified, true, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
                     documentName: 'PAN Card',
@@ -468,7 +468,8 @@ const DriverRegistrationScreen = () => {
                     existingDocs: uploadedDocuments,
                     vehicleType,
                     userData: mergedUserData,
-                    capturedDocs: documentUris
+                    capturedDocs: documentUris,
+                    fromProfile
                 }))}
 
                 <Text style={styles.sectionHeader}>VEHICLE VERIFICATION</Text>
@@ -478,7 +479,8 @@ const DriverRegistrationScreen = () => {
                     existingDocs: uploadedDocuments,
                     vehicleType,
                     userData: mergedUserData,
-                    capturedDocs: documentUris
+                    capturedDocs: documentUris,
+                    fromProfile
                 }))}
 
                 {renderStep(rcLabel, "Registration Certificate (Mandatory)", faFileLines, !isIdentityVerified, false, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
@@ -487,7 +489,8 @@ const DriverRegistrationScreen = () => {
                     existingDocs: uploadedDocuments,
                     vehicleType,
                     userData: mergedUserData,
-                    capturedDocs: documentUris
+                    capturedDocs: documentUris,
+                    fromProfile
                 }))}
 
                 {renderStep(insuranceLabel, "Commercial policy (Mandatory)", faFileLines, !isIdentityVerified, false, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
@@ -496,7 +499,8 @@ const DriverRegistrationScreen = () => {
                     existingDocs: uploadedDocuments,
                     vehicleType,
                     userData: mergedUserData,
-                    capturedDocs: documentUris
+                    capturedDocs: documentUris,
+                    fromProfile
                 }))}
 
                 {renderStep(permitLabel, "State transport permit (Optional)", faFileLines, !isIdentityVerified, true, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
@@ -505,7 +509,8 @@ const DriverRegistrationScreen = () => {
                     existingDocs: uploadedDocuments,
                     vehicleType,
                     userData: mergedUserData,
-                    capturedDocs: documentUris
+                    capturedDocs: documentUris,
+                    fromProfile
                 }))}
 
                 {renderStep(fitnessLabel, "Vehicle fitness cert (Optional)", faFileLines, !isIdentityVerified, true, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
@@ -514,14 +519,16 @@ const DriverRegistrationScreen = () => {
                     existingDocs: uploadedDocuments,
                     vehicleType,
                     userData: mergedUserData,
-                    capturedDocs: documentUris
+                    capturedDocs: documentUris,
+                    fromProfile
                 }))}
 
                 {renderStep("Vehicle Details", "Make, Model & Plate (Mandatory)", faCar, !isIdentityVerified, false, () => (navigation as any).navigate(isReupload ? 'ReuploadVehicleDetails' : 'DriverVehicleDetails', {
                     existingDocs: uploadedDocuments,
                     vehicleType,
                     userData: mergedUserData, // Pass merged data
-                    capturedDocs: documentUris
+                    capturedDocs: documentUris,
+                    fromProfile
                 }))}
 
                 <View style={{ height: 100 }} />
