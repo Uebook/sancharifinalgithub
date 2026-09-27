@@ -110,15 +110,21 @@ export const getDriverByIdAdmin = async (req, res) => {
 export const getDriverDocumentsAdmin = async (req, res) => {
     try {
         const { id } = req.params;
-        const driver = await User.findById(id);
+        const driver = await User.findById(id).select('-password').lean();
         
         if (!driver || !/^driver$/i.test(driver.role)) {
             return res.status(404).json({ success: false, message: 'Driver not found' });
         }
 
+        const docs = {
+            ...(driver.driverDetails?.documents || {}),
+            profileImage: driver.profileImage || ''
+        };
+
         res.json({
             success: true,
-            data: driver.driverDetails?.documents || {}
+            data: docs,
+            driverDetails: driver.driverDetails
         });
     } catch (error) {
         console.error(error);

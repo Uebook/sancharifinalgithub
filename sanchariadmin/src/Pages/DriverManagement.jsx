@@ -88,21 +88,21 @@ const DriverManagement = ({ view = 'directory' }) => {
             items: [
                 {
                     key: 'aadharFront',
-                    aliases: ['aadharFront', 'aadhar_front', 'aadhar'],
+                    aliases: ['aadharFront', 'aadhar_front', 'aadhar', 'aadhaarFront', 'aadhaar_front', 'aadhaar'],
                     title: 'Aadhaar Card (Front)',
                     required: true,
                     desc: 'Front side with photo & UIDAI number'
                 },
                 {
                     key: 'aadharBack',
-                    aliases: ['aadharBack', 'aadhar_back'],
+                    aliases: ['aadharBack', 'aadhar_back', 'aadhaarBack', 'aadhaar_back'],
                     title: 'Aadhaar Card (Back)',
                     required: true,
                     desc: 'Back side with address details'
                 },
                 {
                     key: 'panCard',
-                    aliases: ['panCard', 'pan', 'pan_card'],
+                    aliases: ['panCard', 'pan', 'pan_card', 'pancard'],
                     title: 'PAN Card',
                     required: false,
                     desc: 'Permanent Account Number for tax compliance'
@@ -115,14 +115,14 @@ const DriverManagement = ({ view = 'directory' }) => {
             items: [
                 {
                     key: 'licenseFront',
-                    aliases: ['licenseFront', 'license_front', 'license', 'drivingLicense'],
+                    aliases: ['licenseFront', 'license_front', 'license', 'drivingLicense', 'driving_license', 'dlFront'],
                     title: 'Driving Licence (Front)',
                     required: true,
                     desc: 'Official motor vehicle driving licence'
                 },
                 {
                     key: 'licenseBack',
-                    aliases: ['licenseBack', 'license_back'],
+                    aliases: ['licenseBack', 'license_back', 'dlBack'],
                     title: 'Driving Licence (Back)',
                     required: true,
                     desc: 'Authorisation classes and expiry date'
@@ -135,28 +135,28 @@ const DriverManagement = ({ view = 'directory' }) => {
             items: [
                 {
                     key: 'rc',
-                    aliases: ['rc', 'registration', 'rcFront', 'vehicleRC', 'rcBook'],
+                    aliases: ['rc', 'registration', 'rcFront', 'vehicleRC', 'rcBook', 'rc_front', 'vehicle_rc'],
                     title: 'Vehicle RC (Registration Certificate)',
                     required: true,
                     desc: 'Official vehicle registration certificate'
                 },
                 {
                     key: 'insurance',
-                    aliases: ['insurance', 'insurancePolicy', 'vehicleInsurance'],
+                    aliases: ['insurance', 'insurancePolicy', 'vehicleInsurance', 'vehicle_insurance'],
                     title: 'Vehicle Insurance',
                     required: true,
                     desc: 'Commercial or comprehensive insurance policy'
                 },
                 {
                     key: 'permit',
-                    aliases: ['permit', 'transportPermit', 'commercialPermit'],
+                    aliases: ['permit', 'transportPermit', 'commercialPermit', 'vehiclePermit', 'vehicle_permit'],
                     title: 'Commercial / State Permit',
                     required: false,
                     desc: 'Commercial transport authorization'
                 },
                 {
                     key: 'fitness',
-                    aliases: ['fitness', 'fitnessCertificate'],
+                    aliases: ['fitness', 'fitnessCertificate', 'fitness_certificate', 'vehicleFitness'],
                     title: 'Fitness Certificate',
                     required: false,
                     desc: 'RTO vehicle fitness certification'
@@ -169,7 +169,7 @@ const DriverManagement = ({ view = 'directory' }) => {
             items: [
                 {
                     key: 'profileImage',
-                    aliases: ['profileImage', 'avatar', 'driverPhoto'],
+                    aliases: ['profileImage', 'avatar', 'driverPhoto', 'profile_image', 'photo'],
                     title: 'Partner Live Profile Photo',
                     required: false,
                     desc: 'Face capture for driver identification'
@@ -353,7 +353,14 @@ const DriverManagement = ({ view = 'directory' }) => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.data.success) {
-                const rawDocs = res.data.data?.driverDetails?.documents || {};
+                const driverObj = res.data.data || {};
+                const rawDocs = {
+                    ...(driverObj.driverDetails?.documents || {}),
+                    ...(driverObj.documents || {})
+                };
+                if (driverObj.profileImage) {
+                    rawDocs.profileImage = driverObj.profileImage;
+                }
                 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/api\/?$/, '').replace(/\/$/, '');
                 const mappedDocs = Object.fromEntries(
                     Object.entries(rawDocs).map(([k, v]) => {
