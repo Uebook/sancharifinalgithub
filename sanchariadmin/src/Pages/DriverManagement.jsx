@@ -673,7 +673,8 @@ const DriverManagement = ({ view = 'directory' }) => {
                                 <div><span className="text-slate-500">Vehicle:</span> <span className="text-slate-200 font-medium">{d.vehicle}</span></div>
                                 <div><span className="text-slate-500">Plate No:</span> <span className="text-emerald-400 font-bold">{d.plateNumber}</span></div>
                                 <div><span className="text-slate-500">Type / Fuel:</span> <span className="text-slate-300">{d.vehicleType} • {d.fuelType}</span></div>
-                                <div><span className="text-slate-500">Capacity / Year:</span> <span className="text-slate-300">{d.seatingCapacity} Seats • {d.vehicleYear}</span></div>
+                                <div><span className="text-slate-500">Color / Year:</span> <span className="text-slate-300">{d.vehicleColor || 'N/A'} • {d.vehicleYear}</span></div>
+                                <div><span className="text-slate-500">Capacity / Boot:</span> <span className="text-slate-300">{d.seatingCapacity} Seats • {d.bootSpace || 'N/A'}</span></div>
                             </div>
                         </div>
 
@@ -684,9 +685,11 @@ const DriverManagement = ({ view = 'directory' }) => {
                             </h4>
                             <div className="text-xs space-y-1">
                                 <div><span className="text-slate-500">Driving License:</span> <span className="text-slate-200 font-medium">{d.licenseNumber}</span></div>
+                                <div><span className="text-slate-500">Holder:</span> <span className="text-slate-300">{d.bankDetails?.accountHolderName || d.name}</span></div>
                                 <div><span className="text-slate-500">Bank Name:</span> <span className="text-slate-300">{d.bankDetails?.bankName || 'N/A'}</span></div>
                                 <div><span className="text-slate-500">Account No:</span> <span className="text-slate-300">{d.bankDetails?.accountNumber || 'N/A'}</span></div>
                                 <div><span className="text-slate-500">IFSC Code:</span> <span className="text-slate-300">{d.bankDetails?.ifscCode || 'N/A'}</span></div>
+                                <div><span className="text-slate-500">UPI ID:</span> <span className="text-purple-400 font-medium">{d.bankDetails?.upiId || 'N/A'}</span></div>
                             </div>
                         </div>
 
@@ -707,35 +710,123 @@ const DriverManagement = ({ view = 'directory' }) => {
 
                 {/* Verified Documents Section */}
                 <div className="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800 p-6">
-                    <h3 className="font-bold text-white mb-4 flex items-center gap-2"><FileText size={18} className="text-blue-400" /> Partner Uploaded Verification Documents</h3>
+                    <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                        <FileText size={18} className="text-blue-400" /> Partner Uploaded Verification Documents
+                    </h3>
                     {isLoadingDocs ? (
                         <div className="text-center py-8 text-slate-400 text-sm">
+                            <Clock className="animate-spin mx-auto mb-2 text-emerald-400" size={20} />
                             Loading partner verification documents...
                         </div>
-                    ) : Object.keys(selectedDriverDocs).length === 0 ? (
-                        <div className="text-center py-8 bg-slate-800/40 rounded-xl border border-dashed border-slate-700 text-slate-400 text-sm">
-                            No verification documents uploaded yet.
-                        </div>
                     ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                            {Object.entries(selectedDriverDocs).map(([key, url]) => (
-                                <div key={key} className="group cursor-pointer" onClick={() => setViewingImage({ url, title: key.replace(/([A-Z])/g, ' $1').trim() })}>
-                                    <div className="aspect-video bg-slate-800 rounded-xl overflow-hidden border border-slate-700 mb-2 relative flex items-center justify-center">
-                                        <img
-                                            src={url}
-                                            alt={key}
-                                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                                            onError={(e) => {
-                                                e.currentTarget.src = `https://placehold.co/600x400/1e293b/94a3b8?text=${encodeURIComponent(key.replace(/([A-Z])/g, ' $1').trim())}`;
-                                            }}
-                                        />
-                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                                            <Eye className="text-white opacity-0 group-hover:opacity-100 drop-shadow-md" size={24} />
+                        <div className="space-y-6">
+                            {STANDARD_DOC_SECTIONS.map((section, sIdx) => {
+                                const SectionIcon = section.icon;
+                                return (
+                                    <div key={sIdx} className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5">
+                                        <div className="flex items-center justify-between mb-4 border-b border-slate-800/80 pb-2.5">
+                                            <div className="flex items-center gap-2.5">
+                                                <SectionIcon size={16} className="text-emerald-400" />
+                                                <h5 className="text-sm font-bold text-white tracking-wide">{section.category}</h5>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {section.items.map((item) => {
+                                                const docUrl = getDocUrl(selectedDriverDocs, item.aliases);
+                                                const isUploaded = !!docUrl;
+
+                                                return (
+                                                    <div
+                                                        key={item.key}
+                                                        className={`rounded-xl border p-3.5 flex flex-col justify-between transition-all ${
+                                                            isUploaded
+                                                                ? 'bg-slate-900/90 border-slate-700/80 hover:border-emerald-500/50 shadow-sm'
+                                                                : 'bg-slate-900/30 border-dashed border-slate-800'
+                                                        }`}
+                                                    >
+                                                        <div>
+                                                            <div className="flex items-center justify-between gap-2 mb-2">
+                                                                <p className="text-xs font-bold text-white line-clamp-1">{item.title}</p>
+                                                                {isUploaded ? (
+                                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                                                                        <CheckCircle size={10} /> Uploaded
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                                                        item.required
+                                                                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                                                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                                                    }`}>
+                                                                        {item.required ? 'Missing' : 'Optional'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-[11px] text-slate-400 mb-3">{item.desc}</p>
+                                                        </div>
+
+                                                        {isUploaded ? (
+                                                            <div
+                                                                className="aspect-video w-full bg-slate-950 rounded-lg overflow-hidden border border-slate-800 relative cursor-pointer group shadow-inner"
+                                                                onClick={() => setViewingImage({ url: docUrl, title: `${d.name} — ${item.title}` })}
+                                                            >
+                                                                <img
+                                                                    src={docUrl}
+                                                                    alt={item.title}
+                                                                    className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                                                                />
+                                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                                                                    <span className="px-3 py-1.5 bg-black/70 backdrop-blur-md rounded-lg text-white text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 shadow-lg">
+                                                                        <Eye size={14} /> Enlarge View
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="aspect-video w-full rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-500 p-3 bg-slate-950/40">
+                                                                <AlertCircle size={20} className="mb-1 text-slate-600" />
+                                                                <span className="text-[11px] text-slate-500 font-medium">No document uploaded</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
-                                    <p className="text-xs font-medium text-slate-300 capitalize text-center">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                                );
+                            })}
+
+                            {/* Additional / Unmapped Uploads (if any) */}
+                            {selectedDriverDocs && Object.entries(selectedDriverDocs).filter(([k, v]) => {
+                                if (!v) return false;
+                                const allKnownAliases = STANDARD_DOC_SECTIONS.flatMap(s => s.items.flatMap(i => i.aliases));
+                                return !allKnownAliases.includes(k);
+                            }).length > 0 && (
+                                <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 sm:p-5">
+                                    <h5 className="text-sm font-bold text-white tracking-wide mb-3 flex items-center gap-2">
+                                        <FileText size={16} className="text-blue-400" /> Additional Uploaded Files
+                                    </h5>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {Object.entries(selectedDriverDocs).filter(([k, v]) => {
+                                            if (!v) return false;
+                                            const allKnownAliases = STANDARD_DOC_SECTIONS.flatMap(s => s.items.flatMap(i => i.aliases));
+                                            return !allKnownAliases.includes(k);
+                                        }).map(([docType, url]) => (
+                                            <div key={docType} className="border border-slate-700/80 rounded-xl p-3 bg-slate-900/90 shadow-sm">
+                                                <p className="text-xs font-bold text-slate-300 mb-2 capitalize">{docType.replace(/([A-Z])/g, ' $1').trim()}</p>
+                                                <div
+                                                    className="aspect-video bg-slate-950 rounded-lg overflow-hidden border border-slate-800 relative cursor-pointer group"
+                                                    onClick={() => setViewingImage({ url, title: docType })}
+                                                >
+                                                    <img src={url} alt={docType} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                                                        <Eye size={20} className="text-white opacity-0 group-hover:opacity-100" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            ))}
+                            )}
                         </div>
                     )}
                 </div>
