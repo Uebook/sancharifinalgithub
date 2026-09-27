@@ -24,9 +24,9 @@ const Layout = ({ children }) => {
     return (
         <div className="flex h-screen bg-[#020617] font-sans overflow-hidden">
             <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
-            <div className={`flex-1 flex flex-col transition-all duration-[400ms] h-full ${isSidebarOpen ? 'ml-72' : 'ml-0'}`}>
+            <div className={`flex-1 min-w-0 flex flex-col transition-all duration-[400ms] h-full ${isSidebarOpen ? 'ml-72' : 'ml-0'}`}>
                 <Header toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
-                <main className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent p-6 scroll-smooth relative">
+                <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto bg-transparent p-4 sm:p-6 scroll-smooth relative">
                     <AnimatePresence mode="wait">
                         {isLoading ? (
                             <motion.div

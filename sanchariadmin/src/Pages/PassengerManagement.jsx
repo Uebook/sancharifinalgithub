@@ -595,8 +595,8 @@ const PassengerManagement = ({ view = 'directory' }) => {
                 )}
 
                 {!error && (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
+                    <div className="overflow-x-auto w-full pb-2">
+                        <table className="w-full min-w-[900px] whitespace-nowrap text-left">
                             <thead className="bg-slate-800/60 border-b border-slate-800">
                                 <tr>
                                     <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider w-16">S.No.</th>
