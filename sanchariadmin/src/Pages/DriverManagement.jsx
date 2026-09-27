@@ -301,17 +301,17 @@ const DriverManagement = ({ view = 'directory' }) => {
                     preferences: d.driverDetails?.preferences || {},
                     verificationStatus: d.verificationStatus || {},
                     emergencyContact: d.emergencyContact || {},
-                    avatar: d.profileImage ? (() => {
-                        if (d.profileImage.startsWith('http') || d.profileImage.startsWith('data:image')) return d.profileImage;
+                    avatar: (typeof d.profileImage === 'string' && d.profileImage) ? (() => {
+                        if (d.profileImage.startsWith('http') || d.profileImage.startsWith('data:')) return d.profileImage;
                         const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/api\/?$/, '').replace(/\/$/, '');
                         const filePath = d.profileImage.startsWith('/') ? d.profileImage : `/${d.profileImage}`;
                         return `${baseUrl}${filePath}`;
-                    })() : `https://ui-avatars.com/api/?name=${encodeURIComponent(d.name)}&background=random`,
+                    })() : `https://ui-avatars.com/api/?name=${encodeURIComponent(d.name || 'Driver')}&background=random`,
                     driverDetails: d.driverDetails,
-                    documents: d.driverDetails?.documents ? Object.fromEntries(
+                    documents: (d.driverDetails?.documents && typeof d.driverDetails.documents === 'object') ? Object.fromEntries(
                         Object.entries(d.driverDetails.documents).map(([k, v]) => {
-                            if (!v) return [k, v];
-                            if (v.startsWith('http') || v.startsWith('data:image')) return [k, v];
+                            if (!v || typeof v !== 'string') return [k, v];
+                            if (v.startsWith('http') || v.startsWith('data:')) return [k, v];
                             const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/api\/?$/, '').replace(/\/$/, '');
                             const filePath = v.startsWith('/') ? v : `/${v}`;
                             return [k, `${baseUrl}${filePath}`];

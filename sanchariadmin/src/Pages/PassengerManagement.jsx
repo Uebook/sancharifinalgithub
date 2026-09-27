@@ -102,12 +102,12 @@ const PassengerManagement = ({ view = 'directory' }) => {
                     travelStats: p.travelStats || { totalSavings: 0, co2Saved: 0 },
                     savedPlaces: p.savedPlaces || [],
                     fcmToken: p.fcmToken || 'N/A',
-                    avatar: p.profileImage ? (() => {
-                        if (p.profileImage.startsWith('http') || p.profileImage.startsWith('data:image')) return p.profileImage;
+                    avatar: (typeof p.profileImage === 'string' && p.profileImage) ? (() => {
+                        if (p.profileImage.startsWith('http') || p.profileImage.startsWith('data:')) return p.profileImage;
                         const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/api\/?$/, '').replace(/\/$/, '');
                         const filePath = p.profileImage.startsWith('/') ? p.profileImage : `/${p.profileImage}`;
                         return `${baseUrl}${filePath}`;
-                    })() : `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random`
+                    })() : `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name || 'User')}&background=random`
                 }));
                 setPassengers(formatted);
             } else {
