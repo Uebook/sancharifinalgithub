@@ -260,7 +260,7 @@ const DriverManagement = ({ view = 'directory' }) => {
             const token = localStorage.getItem('adminToken');
             const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/admin/drivers`, {
                 headers: { Authorization: `Bearer ${token}` },
-                timeout: 30000
+                timeout: 60000
             });
 
             if (res.data.success) {
@@ -412,7 +412,8 @@ const DriverManagement = ({ view = 'directory' }) => {
     const handleToggleStatus = async (partner, newStatus) => {
         try {
             const token = localStorage.getItem('adminToken');
-            const res = await axios.put(`${import.meta.env.VITE_API_BASE_URL}/api/admin/drivers/${partner.id}/status`, {
+            const targetId = partner.id || partner._id;
+            const res = await axios.put(`${import.meta.env.VITE_API_BASE_URL}/api/admin/drivers/${targetId}/status`, {
                 status: newStatus
             }, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -420,6 +421,10 @@ const DriverManagement = ({ view = 'directory' }) => {
 
             if (res.data.success) {
                 fetchDrivers();
+                setSelectedDriver(prev => {
+                    if (!prev || (prev.id !== targetId && prev._id !== targetId)) return prev;
+                    return { ...prev, status: newStatus, isBlocked: newStatus === 'suspended' };
+                });
             } else {
                 alert(res.data.message || 'Failed to update partner status');
             }
@@ -440,6 +445,10 @@ const DriverManagement = ({ view = 'directory' }) => {
                 fetchDrivers();
                 setIsDocModalOpen(false);
                 setIsRejectBoxOpen(false);
+                setSelectedDriver(prev => {
+                    if (!prev || (prev.id !== id && prev._id !== id)) return prev;
+                    return { ...prev, status: 'active', approvalStatus: 'approved', rejectionReason: '' };
+                });
             }
         } catch (error) {
             console.error(error);
@@ -466,6 +475,10 @@ const DriverManagement = ({ view = 'directory' }) => {
                 setIsDocModalOpen(false);
                 setIsRejectBoxOpen(false);
                 setRejectionReasonInput('');
+                setSelectedDriver(prev => {
+                    if (!prev || (prev.id !== id && prev._id !== id)) return prev;
+                    return { ...prev, status: 'rejected', approvalStatus: 'rejected', rejectionReason: reason };
+                });
             }
         } catch (error) {
             console.error(error);
@@ -579,12 +592,84 @@ const DriverManagement = ({ view = 'directory' }) => {
 
         return (
             <div className="space-y-6">
-                <button
-                    onClick={() => setSelectedDriver(null)}
-                    className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors font-medium text-sm bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700 w-fit"
-                >
-                    <ChevronDown className="rotate-90" size={18} /> Back to Partner Directory
-                </button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                    <button
+                        onClick={() => setSelectedDriver(null)}
+                        className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors font-medium text-sm bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-700 w-fit shadow-sm"
+                    >
+                        <ChevronDown className="rotate-90" size={18} /> Back to Partner Directory
+                    </button>
+
+                    {/* Admin Approval & Status Change Controls */}
+                    <div className="flex items-center gap-2.5 flex-wrap bg-slate-900/90 border border-slate-800 p-2 rounded-2xl shadow-lg">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider pl-2 pr-1 hidden md:inline">
+                            Status Actions:
+                        </span>
+
+                        {/* Approve Button */}
+                        {(d.status !== 'active' || d.approvalStatus !== 'approved') && (
+                            <button
+                                onClick={() => handleApprove(d.id)}
+                                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/20 active:scale-95 cursor-pointer"
+                                title="Approve driver documents & activate account"
+                            >
+                                <CheckCircle size={15} /> Approve Partner
+                            </button>
+                        )}
+
+                        {/* Suspend / Block Button (if Active) */}
+                        {d.status === 'active' && (
+                            <button
+                                onClick={() => handleToggleStatus(d, 'suspended')}
+                                className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer"
+                                title="Suspend this partner account"
+                            >
+                                <Ban size={15} /> Suspend Partner
+                            </button>
+                        )}
+
+                        {/* Reactivate Button (if Suspended) */}
+                        {d.status === 'suspended' && (
+                            <button
+                                onClick={() => handleToggleStatus(d, 'active')}
+                                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer"
+                                title="Reactivate partner account"
+                            >
+                                <CheckCircle size={15} /> Reactivate Partner
+                            </button>
+                        )}
+
+                        {/* Reject Button */}
+                        {d.status !== 'rejected' && (
+                            <button
+                                onClick={() => handleReject(d.id)}
+                                className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer"
+                                title="Reject application with reason"
+                            >
+                                <Ban size={15} /> Reject
+                            </button>
+                        )}
+
+                        {/* Quick Status Selector Dropdown */}
+                        <div className="relative">
+                            <select
+                                value={d.status}
+                                onChange={(e) => {
+                                    const newStatus = e.target.value;
+                                    if (newStatus === 'active') handleApprove(d.id);
+                                    else if (newStatus === 'rejected') handleReject(d.id);
+                                    else handleToggleStatus(d, newStatus);
+                                }}
+                                className="bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold focus:outline-none focus:border-emerald-500 transition-all cursor-pointer"
+                            >
+                                <option value="active">Active (Approved)</option>
+                                <option value="pending">Pending Verification</option>
+                                <option value="suspended">Suspended</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Profile Main Header Card */}
                 <div className="bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-800 p-6 space-y-6 shadow-xl">

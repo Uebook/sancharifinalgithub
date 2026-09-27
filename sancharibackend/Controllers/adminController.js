@@ -13,7 +13,7 @@ export const getDrivers = async (req, res) => {
     try {
         console.log(`Admin ${req.user.email} fetching drivers...`);
         const { status } = req.query;
-        let query = { role: { $regex: /^driver$/i } };
+        let query = { role: { $in: ['driver', 'DRIVER'] } };
 
         if (status === 'pending') {
             query['driverApprovalStatus'] = 'pending';
@@ -53,12 +53,25 @@ export const getDrivers = async (req, res) => {
             const idStr = d._id.toString();
             const totalRides = (bookingCountMap[idStr] || 0) + (rideCountMap[idStr] || 0);
 
+            // Lighten documents in list response to avoid exceeding Vercel payload/timeout limits
+            let sanitizedDocs = {};
+            if (d.driverDetails?.documents) {
+                for (const [k, v] of Object.entries(d.driverDetails.documents)) {
+                    if (typeof v === 'string' && v.startsWith('data:image') && v.length > 500) {
+                        sanitizedDocs[k] = true;
+                    } else {
+                        sanitizedDocs[k] = v;
+                    }
+                }
+            }
+
             return {
                 ...d,
                 totalRides: totalRides,
                 driverDetails: {
                     ...(d.driverDetails || {}),
-                    totalRides: totalRides
+                    totalRides: totalRides,
+                    documents: sanitizedDocs
                 }
             };
         });
