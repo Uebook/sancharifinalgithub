@@ -49,9 +49,19 @@ const DriverRegistrationScreen = () => {
         capturedDocs?: Record<string, string>
     } || {};
 
-    const [vehicleType, setVehicleType] = useState<string>(params.vehicleType || 'CAR');
+    const initialVehicleType = params.vehicleType || user?.driverDetails?.vehicle?.type || 'CAR';
+    const initialUserData = params.userData || (user ? {
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        vehicle: user.driverDetails?.vehicle || {},
+    } : {});
+    const initialCapturedDocs = params.capturedDocs || user?.driverDetails?.documents || {};
+    const initialUploadedDocs = params.updatedDocList || Object.keys(user?.driverDetails?.documents || {});
+
+    const [vehicleType, setVehicleType] = useState<string>(initialVehicleType);
     // State to hold merged user data across navigation
-    const [mergedUserData, setMergedUserData] = useState(params.userData || {});
+    const [mergedUserData, setMergedUserData] = useState(initialUserData);
 
     const getDocLabel = (baseLabel: string) => {
         const type = (vehicleType || 'CAR').toUpperCase();
@@ -67,8 +77,8 @@ const DriverRegistrationScreen = () => {
     const permitLabel = getDocLabel('Permit');
     const fitnessLabel = getDocLabel('Fitness');
 
-    const [uploadedDocuments, setUploadedDocuments] = useState<string[]>(params.updatedDocList || []);
-    const [documentUris, setDocumentUris] = useState<Record<string, string>>(params.capturedDocs || {});
+    const [uploadedDocuments, setUploadedDocuments] = useState<string[]>(initialUploadedDocs);
+    const [documentUris, setDocumentUris] = useState<Record<string, string>>(initialCapturedDocs);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Load initial draft from persistent storage on mount
@@ -119,6 +129,12 @@ const DriverRegistrationScreen = () => {
 
         if (isReupload) {
             (navigation as any).navigate('DriverPendingApproval');
+        } else if (user && user.role === 'driver' && user.driverApprovalStatus === 'approved') {
+            if (navigation.canGoBack()) {
+                navigation.goBack();
+            } else {
+                (navigation as any).navigate('DriverProfile');
+            }
         } else {
             (navigation as any).navigate('DriverVehicleSelection', {
                 userData: mergedUserData,
@@ -128,7 +144,7 @@ const DriverRegistrationScreen = () => {
             });
         }
         return true;
-    }, [navigation, mergedUserData, documentUris, uploadedDocuments, vehicleType, isReupload]);
+    }, [navigation, mergedUserData, documentUris, uploadedDocuments, vehicleType, isReupload, user]);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -193,9 +209,9 @@ const DriverRegistrationScreen = () => {
 
     const checkIsCompleted = (title: string) => {
         if (uploadedDocuments.includes(title)) return true;
-        if (title === 'Aadhaar Card') return !!(documentUris.aadharFront && documentUris.aadharBack);
+        if (title === 'Aadhaar Card') return !!(documentUris.aadharFront);
         if (title === 'PAN Card') return !!documentUris.panCard;
-        if (title === 'Driving License') return !!(documentUris.licenseFront && documentUris.licenseBack);
+        if (title === 'Driving License') return !!(documentUris.licenseFront);
         if (title.includes('RC')) return !!documentUris.rc;
         if (title.includes('Insurance')) return !!documentUris.insurance;
         if (title.includes('Permit')) return !!documentUris.permit;

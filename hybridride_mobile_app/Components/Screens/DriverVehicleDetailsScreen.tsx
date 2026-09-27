@@ -13,25 +13,29 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { useAuth } from '../Context/AuthContext';
 import { driverOnboardingStorage } from '../../Services/driverOnboardingStorage';
 
 const DriverVehicleDetailsScreen = () => {
     const navigation = useNavigation();
     const route = useRoute();
+    const { user } = useAuth();
     const { existingDocs = [], vehicleType = 'CAR', userData, capturedDocs = {} } = route.params as any || {};
     const isReupload = route.name === 'ReuploadVehicleDetails';
     const targetScreen = isReupload ? 'ReuploadRegistration' : 'DriverRegistration';
 
-    const [make, setMake] = useState(userData?.vehicle?.make || '');
-    const [model, setModel] = useState(userData?.vehicle?.model || '');
-    const [year, setYear] = useState(userData?.vehicle?.year || '');
-    const [plateNumber, setPlateNumber] = useState(userData?.vehicle?.plateNumber || '');
-    const [color, setColor] = useState(userData?.vehicle?.color || '');
-    const [fuelType, setFuelType] = useState(userData?.vehicle?.fuelType || 'Petrol');
+    const vehicleFallback = userData?.vehicle || user?.driverDetails?.vehicle || {};
+
+    const [make, setMake] = useState(vehicleFallback?.make || '');
+    const [model, setModel] = useState(vehicleFallback?.model || '');
+    const [year, setYear] = useState(vehicleFallback?.year || '');
+    const [plateNumber, setPlateNumber] = useState(vehicleFallback?.plateNumber || '');
+    const [color, setColor] = useState(vehicleFallback?.color || '');
+    const [fuelType, setFuelType] = useState(vehicleFallback?.fuelType || 'Petrol');
     const [seatingCapacity, setSeatingCapacity] = useState(
-        userData?.vehicle?.seatingCapacity || (vehicleType === 'BIKE' ? 1 : 4)
+        vehicleFallback?.seatingCapacity || (vehicleType === 'BIKE' ? 1 : 4)
     );
-    const [bootSpace, setBootSpace] = useState(userData?.vehicle?.bootSpace || '');
+    const [bootSpace, setBootSpace] = useState(vehicleFallback?.bootSpace || '');
 
     useEffect(() => {
         const loadInitialDraft = async () => {

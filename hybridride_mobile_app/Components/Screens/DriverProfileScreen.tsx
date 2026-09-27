@@ -157,6 +157,20 @@ const DriverProfileScreen = () => {
     };
     const profileStrength = calculateStrength();
 
+    const handleOpenRegistration = () => {
+        (navigation as any).navigate('DriverRegistration', {
+            userData: {
+                name: user?.name,
+                email: user?.email,
+                phone: user?.phone,
+                vehicle: user?.driverDetails?.vehicle || {},
+            },
+            vehicleType: user?.driverDetails?.vehicle?.type || 'CAR',
+            capturedDocs: user?.driverDetails?.documents || {},
+            updatedDocList: Object.keys(user?.driverDetails?.documents || {}),
+        });
+    };
+
     return (
         <View style={styles.container}>
             <SafeAreaView style={styles.content}>
@@ -249,13 +263,13 @@ const DriverProfileScreen = () => {
                     <View style={styles.sectionContainer}>
                         <View style={styles.sectionHeaderRow}>
                             <Text style={styles.sectionTitle}>Trust & Safety Center</Text>
-                            <TouchableOpacity onPress={() => (navigation as any).navigate('DriverRegistration')}>
+                            <TouchableOpacity onPress={handleOpenRegistration}>
                                 <Text style={styles.editText}>VIEW DOCUMENTS</Text>
                             </TouchableOpacity>
                         </View>
                         <TouchableOpacity
                             style={styles.trustCard}
-                            onPress={() => (navigation as any).navigate('DriverRegistration')}
+                            onPress={handleOpenRegistration}
                             activeOpacity={0.8}
                         >
                             <View style={styles.trustHeader}>
@@ -304,7 +318,7 @@ const DriverProfileScreen = () => {
                         {/* 1. Driver Registration & KYC Documents */}
                         <TouchableOpacity
                             style={styles.menuItem}
-                            onPress={() => (navigation as any).navigate('DriverRegistration')}
+                            onPress={handleOpenRegistration}
                             activeOpacity={0.7}
                         >
                             <View style={[styles.menuIconBox, { backgroundColor: '#EFF6FF' }]}>
