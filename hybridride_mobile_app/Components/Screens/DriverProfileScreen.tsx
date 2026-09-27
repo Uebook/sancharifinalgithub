@@ -36,7 +36,8 @@ import {
     faPen,
     faCamera,
     faUniversity,
-    faRightFromBracket
+    faRightFromBracket,
+    faIdCard
 } from '@fortawesome/free-solid-svg-icons';
 import { useNavigation } from '@react-navigation/native';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -246,16 +247,26 @@ const DriverProfileScreen = () => {
 
                     {/* Trust & Safety Center */}
                     <View style={styles.sectionContainer}>
-                        <Text style={styles.sectionTitle}>Trust & Safety Center</Text>
-                        <View style={styles.trustCard}>
+                        <View style={styles.sectionHeaderRow}>
+                            <Text style={styles.sectionTitle}>Trust & Safety Center</Text>
+                            <TouchableOpacity onPress={() => (navigation as any).navigate('DriverRegistration')}>
+                                <Text style={styles.editText}>VIEW DOCUMENTS</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.trustCard}
+                            onPress={() => (navigation as any).navigate('DriverRegistration')}
+                            activeOpacity={0.8}
+                        >
                             <View style={styles.trustHeader}>
                                 <View style={styles.shieldIconContainer}>
                                     <FontAwesomeIcon icon={faShieldHalved} size={20} color="#059669" />
                                 </View>
-                                <View>
-                                    <Text style={styles.trustTitle}>Trust Profile</Text>
-                                    <Text style={styles.trustSubtitle}>Verified profiles build better communities</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.trustTitle}>Driver Verification</Text>
+                                    <Text style={styles.trustSubtitle}>View & update your KYC and vehicle documents</Text>
                                 </View>
+                                <FontAwesomeIcon icon={faChevronRight} size={14} color="#9CA3AF" />
                             </View>
 
                             <View style={styles.badgesRow}>
@@ -285,35 +296,68 @@ const DriverProfileScreen = () => {
                                     <Text style={[styles.verifiedText, { color: '#2563EB' }]}>Community Trusted</Text>
                                 </View>
                             )}
-                        </View>
+                        </TouchableOpacity>
                     </View>
-
-                    {/* Ride Personality */}
-                    {/* <View style={styles.sectionContainer}>
-                        <View style={styles.sectionHeaderRow}>
-                            <Text style={styles.sectionTitle}>Ride Personality</Text>
-                            <TouchableOpacity>
-                                <Text style={styles.editText}>EDIT</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <Text style={styles.subSectionTitle}>MY RIDE STYLE</Text>
-
-                        <View style={[styles.tagsRow, { flexWrap: 'wrap' }]}>
-                            {user?.ridePersonality && user.ridePersonality.length > 0 ? (
-                                user.ridePersonality.map((tag, index) => (
-                                    <View key={index} style={[styles.tag, { marginBottom: 8 }]}>
-                                        <FontAwesomeIcon icon={faSeedling} size={14} color="#374151" style={{ marginRight: 6 }} />
-                                        <Text style={styles.tagText}>{tag}</Text>
-                                    </View>
-                                ))
-                            ) : (
-                                <Text style={{ color: '#9CA3AF', fontSize: 13 }}>No preferences set</Text>
-                            )}
-                        </View>
-                    </View> */}
 
                     {/* Menu Links */}
                     <View style={styles.menuContainer}>
+                        {/* 1. Driver Registration & KYC Documents */}
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => (navigation as any).navigate('DriverRegistration')}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.menuIconBox, { backgroundColor: '#EFF6FF' }]}>
+                                <FontAwesomeIcon icon={faIdCard} size={18} color="#2563EB" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.menuText}>Driver Registration</Text>
+                                <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>
+                                    Identity & Vehicle Verification
+                                </Text>
+                            </View>
+                            <View style={{
+                                paddingHorizontal: 8,
+                                paddingVertical: 3,
+                                borderRadius: 12,
+                                backgroundColor: user?.driverApprovalStatus === 'approved' ? '#ECFDF5' : user?.driverApprovalStatus === 'rejected' ? '#FEF2F2' : '#FFFBEB',
+                                marginRight: 6
+                            }}>
+                                <Text style={{
+                                    fontSize: 10,
+                                    fontWeight: '800',
+                                    color: user?.driverApprovalStatus === 'approved' ? '#059669' : user?.driverApprovalStatus === 'rejected' ? '#DC2626' : '#D97706',
+                                    textTransform: 'uppercase'
+                                }}>
+                                    {user?.driverApprovalStatus === 'approved' ? 'Verified' : user?.driverApprovalStatus === 'rejected' ? 'Action Req' : 'Pending'}
+                                </Text>
+                            </View>
+                            <FontAwesomeIcon icon={faChevronRight} size={14} color="#D1D5DB" />
+                        </TouchableOpacity>
+
+                        <View style={styles.divider} />
+
+                        {/* 2. Bank & UPI Settlement */}
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => (navigation as any).navigate('DriverBankDetails')}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.menuIconBox, { backgroundColor: '#F0FDF4' }]}>
+                                <FontAwesomeIcon icon={faUniversity} size={18} color="#059669" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.menuText}>Bank & UPI Details</Text>
+                                <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>
+                                    Payout Account for Earnings
+                                </Text>
+                            </View>
+                            <FontAwesomeIcon icon={faChevronRight} size={14} color="#D1D5DB" />
+                        </TouchableOpacity>
+
+                        <View style={styles.divider} />
+
+                        {/* 3. My Rides */}
                         <TouchableOpacity style={styles.menuItem} onPress={() => (navigation as any).navigate('DriverProfileMyTrips')}>
                             <View style={styles.menuIconBox}>
                                 <FontAwesomeIcon icon={faClock} size={18} color="#2563EB" />
@@ -324,6 +368,7 @@ const DriverProfileScreen = () => {
 
                         <View style={styles.divider} />
 
+                        {/* 4. Wallet */}
                         <TouchableOpacity style={styles.menuItem} onPress={() => (navigation as any).navigate('Wallet')}>
                             <View style={styles.menuIconBox}>
                                 <FontAwesomeIcon icon={faWallet} size={18} color="#059669" />
@@ -337,8 +382,7 @@ const DriverProfileScreen = () => {
 
                         <View style={styles.divider} />
 
-                        <View style={styles.divider} />
-
+                        {/* 5. Logout */}
                         <TouchableOpacity style={styles.menuItem} onPress={handleLogout} activeOpacity={0.8}>
                             <View style={[styles.menuIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
                                 <FontAwesomeIcon icon={faRightFromBracket} size={18} color="#EF4444" />
