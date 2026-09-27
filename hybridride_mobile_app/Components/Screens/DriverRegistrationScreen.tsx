@@ -10,6 +10,7 @@ import {
     Alert,
     Modal,
     BackHandler,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
@@ -293,11 +294,11 @@ const DriverRegistrationScreen = () => {
             console.log("Starting uploads...");
 
             // 2. Upload Profile Image (if exists)
-            if (mergedUserData.profileImage && !mergedUserData.profileImage.startsWith('http')) {
+            if (mergedUserData.profileImage && !mergedUserData.profileImage.startsWith('http') && !mergedUserData.profileImage.startsWith('data:')) {
                 console.log("Uploading profile image...");
                 const profileFormData = new FormData();
                 profileFormData.append('document', {
-                    uri: mergedUserData.profileImage,
+                    uri: Platform.OS === 'android' ? mergedUserData.profileImage : mergedUserData.profileImage.replace('file://', ''),
                     type: 'image/jpeg',
                     name: 'profile.jpg',
                 } as any);
@@ -314,12 +315,12 @@ const DriverRegistrationScreen = () => {
 
             // 2. Upload Other Documents (Sequential to avoid race conditions)
             for (const [docType, uri] of Object.entries(documentUris)) {
-                if (uri.startsWith('http')) continue; // Skip already uploaded/server-side URLs
+                if (!uri || uri.startsWith('http') || uri.startsWith('data:')) continue; // Skip already uploaded/server-side URLs
 
                 console.log(`Uploading ${docType}...`);
                 const formData = new FormData();
                 formData.append('document', {
-                    uri: uri,
+                    uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
                     type: 'image/jpeg',
                     name: `${docType}.jpg`,
                 } as any);

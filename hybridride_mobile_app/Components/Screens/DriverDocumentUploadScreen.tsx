@@ -8,6 +8,8 @@ import {
     Alert,
     ScrollView,
     BackHandler,
+    Platform,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
@@ -18,11 +20,14 @@ import {
     faCircleInfo
 } from '@fortawesome/free-solid-svg-icons';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { useAuth } from '../Context/AuthContext';
+import { driverService } from '../../Services/driverService';
 import { driverOnboardingStorage } from '../../Services/driverOnboardingStorage';
 
 const DriverDocumentUploadScreen = () => {
     const navigation = useNavigation();
     const route = useRoute();
+    const { user, refetchUser } = useAuth();
     const { documentName = 'Document', description = 'Upload a clear photo.', existingDocs = [], vehicleType = 'CAR', userData, capturedDocs = {} } = route.params as any || {};
     const isReupload = route.name === 'ReuploadDocumentUpload';
     const targetScreen = isReupload ? 'ReuploadRegistration' : 'DriverRegistration';
@@ -47,6 +52,7 @@ const DriverDocumentUploadScreen = () => {
 
     const [frontImage, setFrontImage] = useState<string | null>(capturedDocs[frontDocTypeKey] || null);
     const [backImage, setBackImage] = useState<string | null>(capturedDocs[backDocTypeKey] || null);
+    const [isUploading, setIsUploading] = useState(false);
 
     useEffect(() => {
         const loadInitialDraft = async () => {
@@ -178,14 +184,57 @@ const DriverDocumentUploadScreen = () => {
 
         const updatedList = Array.from(new Set([...existingDocs, documentName]));
 
+        // If user is already authenticated/existing, upload directly to server!
+        if (user) {
+            setIsUploading(true);
+            try {
+                if (frontImage && !frontImage.startsWith('http') && !frontImage.startsWith('data:')) {
+                    const frontFormData = new FormData();
+                    frontFormData.append('docType', frontDocTypeKey);
+                    frontFormData.append('document', {
+                        uri: Platform.OS === 'android' ? frontImage : frontImage.replace('file://', ''),
+                        type: 'image/jpeg',
+                        name: `${frontDocTypeKey}.jpg`,
+                    } as any);
+                    const res = await driverService.uploadDocument(frontFormData);
+                    if (res?.filePath) {
+                        finalCapturedDocs[frontDocTypeKey] = res.filePath;
+                    }
+                }
+
+                if (backImage && isBothSidesRequired && !backImage.startsWith('http') && !backImage.startsWith('data:')) {
+                    const backFormData = new FormData();
+                    backFormData.append('docType', backDocTypeKey);
+                    backFormData.append('document', {
+                        uri: Platform.OS === 'android' ? backImage : backImage.replace('file://', ''),
+                        type: 'image/jpeg',
+                        name: `${backDocTypeKey}.jpg`,
+                    } as any);
+                    const res = await driverService.uploadDocument(backFormData);
+                    if (res?.filePath) {
+                        finalCapturedDocs[backDocTypeKey] = res.filePath;
+                    }
+                }
+
+                await refetchUser();
+                Alert.alert("Success", `${documentName} uploaded successfully!`);
+            } catch (uploadErr: any) {
+                console.error("Failed to upload document to server:", uploadErr);
+                const errMsg = uploadErr.response?.data?.message || uploadErr.message || 'Upload failed';
+                Alert.alert("Upload Notice", `Saved locally: ${errMsg}`);
+            } finally {
+                setIsUploading(false);
+            }
+        } else {
+            Alert.alert("Success", "Document saved pending registration!");
+        }
+
         await driverOnboardingStorage.saveDraft({
             capturedDocs: finalCapturedDocs,
             uploadedDocuments: updatedList,
             userData,
             vehicleType
         });
-
-        Alert.alert("Success", "Document saved pending registration!");
 
         (navigation as any).navigate(targetScreen, {
             completedDocument: documentName,
@@ -267,13 +316,17 @@ const DriverDocumentUploadScreen = () => {
             {/* Footer */}
             <View style={styles.footer}>
                 <TouchableOpacity
-                    style={[styles.submitButton, isSubmitEnabled && styles.submitButtonActive]}
-                    disabled={!isSubmitEnabled}
+                    style={[styles.submitButton, isSubmitEnabled && !isUploading && styles.submitButtonActive]}
+                    disabled={!isSubmitEnabled || isUploading}
                     onPress={handleSubmit}
                 >
-                    <Text style={[styles.submitButtonText, isSubmitEnabled && styles.submitButtonTextActive]}>
-                        Submit Document
-                    </Text>
+                    {isUploading ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                        <Text style={[styles.submitButtonText, isSubmitEnabled && styles.submitButtonTextActive]}>
+                            {user ? 'Upload Document' : 'Submit Document'}
+                        </Text>
+                    )}
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
