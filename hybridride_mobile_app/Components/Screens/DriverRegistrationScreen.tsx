@@ -457,7 +457,6 @@ const DriverRegistrationScreen = () => {
                 {renderStep("Aadhaar Card", "Government Identity (Mandatory)", faIdCard, false, false, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
                     documentName: 'Aadhaar Card',
                     description: 'Upload a clear photo of your Aadhaar card (Front & Back).',
-                    enableDigiLocker: true,
                     existingDocs: uploadedDocuments,
                     vehicleType,
                     userData: mergedUserData,
@@ -466,7 +465,6 @@ const DriverRegistrationScreen = () => {
                 {renderStep("PAN Card", "For Tax Compliance (Optional)", faCreditCard, !isIdentityVerified, true, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
                     documentName: 'PAN Card',
                     description: 'Upload a clear photo of your PAN card (Front).',
-                    enableDigiLocker: true,
                     existingDocs: uploadedDocuments,
                     vehicleType,
                     userData: mergedUserData,
@@ -477,7 +475,6 @@ const DriverRegistrationScreen = () => {
                 {renderStep("Driving License", "Valid government DL (Mandatory)", faFileLines, !isIdentityVerified, false, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
                     documentName: 'Driving License',
                     description: 'Upload a clear photo of your Driving License (Front & Back).',
-                    enableDigiLocker: true,
                     existingDocs: uploadedDocuments,
                     vehicleType,
                     userData: mergedUserData,

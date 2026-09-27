@@ -23,11 +23,9 @@ import { driverOnboardingStorage } from '../../Services/driverOnboardingStorage'
 const DriverDocumentUploadScreen = () => {
     const navigation = useNavigation();
     const route = useRoute();
-    const { documentName = 'Document', description = 'Upload a clear photo.', enableDigiLocker = false, existingDocs = [], vehicleType = 'CAR', userData, capturedDocs = {} } = route.params as any || {};
+    const { documentName = 'Document', description = 'Upload a clear photo.', existingDocs = [], vehicleType = 'CAR', userData, capturedDocs = {} } = route.params as any || {};
     const isReupload = route.name === 'ReuploadDocumentUpload';
     const targetScreen = isReupload ? 'ReuploadRegistration' : 'DriverRegistration';
-
-    const [activeTab, setActiveTab] = useState<'MANUAL' | 'DIGILOCKER'>('MANUAL');
 
     const getDocTypeKey = (uiName: string, side: 'FRONT' | 'BACK') => {
         const lowerName = uiName.toLowerCase();
@@ -210,67 +208,41 @@ const DriverDocumentUploadScreen = () => {
             <ScrollView contentContainerStyle={styles.content}>
                 <Text style={styles.description}>{description}</Text>
 
-                {/* Toggle */}
-                <View style={styles.toggleContainer}>
-                    <TouchableOpacity
-                        style={[styles.toggleButton, activeTab === 'MANUAL' && styles.toggleButtonActive]}
-                        onPress={() => setActiveTab('MANUAL')}
-                    >
-                        <Text style={[styles.toggleText, activeTab === 'MANUAL' && styles.toggleTextActive]}>Manual Upload</Text>
-                    </TouchableOpacity>
-                    {enableDigiLocker && (
-                        <TouchableOpacity
-                            style={[styles.toggleButton, activeTab === 'DIGILOCKER' && styles.toggleButtonActive]}
-                            onPress={() => setActiveTab('DIGILOCKER')}
-                        >
-                            <Text style={[styles.toggleText, activeTab === 'DIGILOCKER' && styles.toggleTextActive]}>DigiLocker</Text>
-                        </TouchableOpacity>
+                {/* Front Side */}
+                <Text style={styles.sectionLabel}>FRONT SIDE PHOTO</Text>
+                <TouchableOpacity
+                    style={styles.uploadBox}
+                    onPress={() => handleImagePick('FRONT')}
+                >
+                    {frontImage ? (
+                        <Image source={{ uri: frontImage }} style={styles.uploadedImage} />
+                    ) : (
+                        <View style={styles.placeholderContainer}>
+                            <View style={styles.addIconCircle}>
+                                <FontAwesomeIcon icon={faPlus} size={20} color="#2DD4BF" />
+                            </View>
+                            <Text style={styles.addPhotoText}>Add Front Photo</Text>
+                        </View>
                     )}
-                </View>
+                </TouchableOpacity>
 
-                {activeTab === 'MANUAL' ? (
-                    <>
-                        {/* Front Side */}
-                        <Text style={styles.sectionLabel}>FRONT SIDE PHOTO</Text>
-                        <TouchableOpacity
-                            style={styles.uploadBox}
-                            onPress={() => handleImagePick('FRONT')}
-                        >
-                            {frontImage ? (
-                                <Image source={{ uri: frontImage }} style={styles.uploadedImage} />
-                            ) : (
-                                <View style={styles.placeholderContainer}>
-                                    <View style={styles.addIconCircle}>
-                                        <FontAwesomeIcon icon={faPlus} size={20} color="#2DD4BF" />
-                                    </View>
-                                    <Text style={styles.addPhotoText}>Add Front Photo</Text>
-                                </View>
-                            )}
-                        </TouchableOpacity>
-
-                        {/* Back Side */}
-                        <Text style={styles.sectionLabel}>BACK SIDE PHOTO (Optional if not applicable)</Text>
-                        <TouchableOpacity
-                            style={styles.uploadBox}
-                            onPress={() => handleImagePick('BACK')}
-                        >
-                            {backImage ? (
-                                <Image source={{ uri: backImage }} style={styles.uploadedImage} />
-                            ) : (
-                                <View style={styles.placeholderContainer}>
-                                    <View style={styles.addIconCircle}>
-                                        <FontAwesomeIcon icon={faPlus} size={20} color="#2DD4BF" />
-                                    </View>
-                                    <Text style={styles.addPhotoText}>Add Back Photo</Text>
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                    </>
-                ) : (
-                    <View style={styles.digiLockerContainer}>
-                        <Text style={styles.digiLockerText}>Connect securely with DigiLocker to fetch your documents instantly.</Text>
-                    </View>
-                )}
+                {/* Back Side */}
+                <Text style={styles.sectionLabel}>BACK SIDE PHOTO (Optional if not applicable)</Text>
+                <TouchableOpacity
+                    style={styles.uploadBox}
+                    onPress={() => handleImagePick('BACK')}
+                >
+                    {backImage ? (
+                        <Image source={{ uri: backImage }} style={styles.uploadedImage} />
+                    ) : (
+                        <View style={styles.placeholderContainer}>
+                            <View style={styles.addIconCircle}>
+                                <FontAwesomeIcon icon={faPlus} size={20} color="#2DD4BF" />
+                            </View>
+                            <Text style={styles.addPhotoText}>Add Back Photo</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
 
                 {/* Tips */}
                 <View style={styles.tipsContainer}>
