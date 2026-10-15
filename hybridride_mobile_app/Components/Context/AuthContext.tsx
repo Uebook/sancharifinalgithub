@@ -22,6 +22,7 @@ interface User {
     token?: string;
     profileImage?: string;
     walletBalance?: number;
+    applicationId?: string;
     driverDetails?: {
         licenseNumber?: string;
         vehicle?: {

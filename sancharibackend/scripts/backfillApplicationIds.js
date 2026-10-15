@@ -29,7 +29,7 @@ const backfillApplicationIds = async () => {
         for (const driver of drivers) {
             if (!driver.applicationId) {
                 driverSeq += 1;
-                const formattedId = `SAN-D-${String(driverSeq).padStart(6, '0')}`;
+                const formattedId = `SAN-P-${String(driverSeq).padStart(6, '0')}`;
                 await User.findByIdAndUpdate(driver._id, { applicationId: formattedId });
                 console.log(`Assigned ${formattedId} to Driver: ${driver.name} (${driver.email || driver.phone || driver._id})`);
                 updatedDrivers++;
@@ -61,7 +61,7 @@ const backfillApplicationIds = async () => {
         for (const passenger of passengers) {
             if (!passenger.applicationId) {
                 passengerSeq += 1;
-                const formattedId = `SAN-P-${String(passengerSeq).padStart(6, '0')}`;
+                const formattedId = `SAN-C-${String(passengerSeq).padStart(6, '0')}`;
                 await User.findByIdAndUpdate(passenger._id, { applicationId: formattedId });
                 console.log(`Assigned ${formattedId} to Passenger: ${passenger.name} (${passenger.email || passenger.phone || passenger._id})`);
                 updatedPassengers++;
@@ -96,8 +96,8 @@ const backfillApplicationIds = async () => {
         await Counter.findByIdAndUpdate('admin_app_id', { seq: adminSeq }, { upsert: true, new: true });
 
         console.log('\n--- Backfill Summary ---');
-        console.log(`Total Drivers Backfilled: ${updatedDrivers} (Current Counter: SAN-D-${String(driverSeq).padStart(6, '0')})`);
-        console.log(`Total Passengers Backfilled: ${updatedPassengers} (Current Counter: SAN-P-${String(passengerSeq).padStart(6, '0')})`);
+        console.log(`Total Drivers Backfilled: ${updatedDrivers} (Current Counter: SAN-P-${String(driverSeq).padStart(6, '0')})`);
+        console.log(`Total Passengers Backfilled: ${updatedPassengers} (Current Counter: SAN-C-${String(passengerSeq).padStart(6, '0')})`);
         console.log(`Total Admins Backfilled: ${updatedAdmins}`);
         console.log('Application ID backfill complete!');
 

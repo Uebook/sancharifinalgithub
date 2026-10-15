@@ -56,7 +56,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 { id: 'live-rides', title: 'Live Rides Track', path: '/rides/live', icon: Activity },
                 { id: 'pools', title: 'City Pool Management', path: '/rides/pools', icon: List },
                 { id: 'planned-commutes', title: 'Scheduled Rides', path: '/rides/planned-commutes', icon: Calendar },
-                { id: 'promoted-routes', title: 'Promoted Routes', path: '/rides/promoted', icon: Tag },
+                { id: 'promoted-routes', title: 'Trending Routes', path: '/rides/promoted', icon: Tag },
                 { id: 'pricing-config', title: 'Pricing & Surcharges', path: '/rides/pricing-config', icon: Banknote },
                 { id: 'ride-history', title: 'Ride History', path: '/rides/history', icon: CalendarCheck }
             ]

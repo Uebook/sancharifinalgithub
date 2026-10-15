@@ -266,7 +266,7 @@ const DriverManagement = ({ view = 'directory' }) => {
             if (res.data.success) {
                 const mappedPartners = res.data.data.map(d => ({
                     id: d._id,
-                    applicationId: d.applicationId || (d._id ? `SAN-D-${d._id.slice(-6).toUpperCase()}` : 'Pending'),
+                    applicationId: d.applicationId || (d._id ? `SAN-P-${d._id.slice(-6).toUpperCase()}` : 'Pending'),
                     name: d.name,
                     phone: d.phone || 'N/A',
                     email: d.email || 'N/A',

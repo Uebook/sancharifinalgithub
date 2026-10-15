@@ -1223,6 +1223,11 @@ const PassengerProfileScreen = () => {
                         </View>
                         <Text style={styles.userName}>{user?.name || 'Customer'}</Text>
                         <Text style={styles.userPhone}>{user?.phone || ''}</Text>
+                        {!!user?.applicationId && (
+                            <View style={styles.appIdBadge}>
+                                <Text style={styles.appIdBadgeText}>App ID: {user.applicationId}</Text>
+                            </View>
+                        )}
 
                         {/* Edit Profile Action Pill */}
                         <TouchableOpacity
@@ -1919,6 +1924,23 @@ const styles = StyleSheet.create({
         color: '#9CA3AF',
         marginHorizontal: 10,
         letterSpacing: 0.5,
+    },
+    appIdBadge: {
+        backgroundColor: '#ECFDF5',
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 12,
+        marginTop: 4,
+        marginBottom: 8,
+        alignSelf: 'center',
+    },
+    appIdBadgeText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#059669',
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     },
 });
 

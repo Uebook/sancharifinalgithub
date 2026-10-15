@@ -79,7 +79,7 @@ const PassengerManagement = ({ view = 'directory' }) => {
             if (res.data.success) {
                 const formatted = res.data.data.map(p => ({
                     id: p._id,
-                    applicationId: p.applicationId || (p._id ? `SAN-P-${p._id.slice(-6).toUpperCase()}` : 'N/A'),
+                    applicationId: p.applicationId || (p._id ? `SAN-C-${p._id.slice(-6).toUpperCase()}` : 'N/A'),
                     name: p.name || '',
                     phone: p.phone || '',
                     email: p.email || '',
