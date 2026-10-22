@@ -5,7 +5,7 @@ import axios from 'axios';
 
 const Login = () => {
     const navigate = useNavigate();
-    const [formData, setFormData] = useState({ email: 'admin@hybridride.com', password: 'admin123' });
+    const [formData, setFormData] = useState({ email: '', password: '' });
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -112,8 +112,9 @@ const Login = () => {
                                 <input
                                     type="email"
                                     required
+                                    autoComplete="email"
                                     className="w-full pl-11 pr-4 py-3 bg-slate-950/80 border border-slate-800 rounded-xl focus:outline-none focus:border-emerald-500 placeholder-slate-600 text-white transition-all text-sm"
-                                    placeholder="admin@hybridride.com"
+                                    placeholder="admin@sanchari.com"
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                 />
@@ -127,8 +128,9 @@ const Login = () => {
                                 <input
                                     type="password"
                                     required
+                                    autoComplete="current-password"
                                     className="w-full pl-11 pr-4 py-3 bg-slate-950/80 border border-slate-800 rounded-xl focus:outline-none focus:border-emerald-500 placeholder-slate-600 text-white transition-all text-sm"
-                                    placeholder="••••••••"
+                                    placeholder="Enter your password"
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 />

@@ -46,13 +46,19 @@ import {
     getPayoutSettings,
     updatePayoutSettings,
     testPayoutConnection,
-    processCashfreeWithdrawalPayout
+    processCashfreeWithdrawalPayout,
+    getAdminProfile,
+    updateAdminProfile
 } from '../Controllers/adminController.js';
 
 const router = express.Router();
 
 // All routes are protected and admin-only
 router.use(protect, adminOnly);
+
+// Admin Profile & Credentials
+router.get('/profile', getAdminProfile);
+router.put('/profile', updateAdminProfile);
 
 router.get('/drivers', getDrivers);
 router.get('/drivers/:id', getDriverByIdAdmin);

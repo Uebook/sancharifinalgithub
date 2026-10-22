@@ -12,7 +12,15 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     const location = useLocation();
     const navigate = useNavigate();
 
-    const adminUser = JSON.parse(localStorage.getItem('adminUser') || '{}');
+    const [adminUser, setAdminUser] = React.useState(() => JSON.parse(localStorage.getItem('adminUser') || '{}'));
+
+    React.useEffect(() => {
+        const handleUpdate = () => {
+            setAdminUser(JSON.parse(localStorage.getItem('adminUser') || '{}'));
+        };
+        window.addEventListener('adminUserUpdated', handleUpdate);
+        return () => window.removeEventListener('adminUserUpdated', handleUpdate);
+    }, []);
 
     const handleLogout = () => {
         localStorage.removeItem('adminToken');
@@ -26,7 +34,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             title: 'OVERVIEW',
             titleColor: 'text-sky-400',
             items: [
-                { id: 'dashboard', title: 'Dashboard', path: '/', icon: LayoutDashboard }
+                { id: 'dashboard', title: 'Dashboard', path: '/', icon: LayoutDashboard },
+                { id: 'admin-profile', title: 'Admin Profile & Security', path: '/profile', icon: UserCog }
             ]
         },
         {
@@ -163,25 +172,31 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             {/* Footer / Profile Section */}
             <div className="p-4 border-t border-slate-800/80 bg-slate-950/40 rounded-br-3xl">
                 <div className="p-3 bg-slate-800/60 rounded-2xl border border-slate-800 flex items-center gap-3">
-                    <div className="relative">
-                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-sm shadow-inner">
-                            {adminUser?.name?.charAt(0)?.toUpperCase() || 'A'}
+                    <Link
+                        to="/profile"
+                        className="flex items-center gap-3 flex-1 min-w-0 group cursor-pointer"
+                        title="Edit Admin Profile & Credentials"
+                    >
+                        <div className="relative shrink-0">
+                            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-sm shadow-inner group-hover:ring-2 group-hover:ring-emerald-400 transition-all">
+                                {adminUser?.name?.charAt(0)?.toUpperCase() || 'A'}
+                            </div>
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900" />
                         </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900" />
-                    </div>
 
-                    <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-bold text-white truncate">
-                            {adminUser?.name || 'Super Admin'}
-                        </h4>
-                        <p className="text-[10px] font-medium text-slate-400 truncate uppercase">
-                            {adminUser?.role || 'Administrator'}
-                        </p>
-                    </div>
+                        <div className="flex-1 min-w-0">
+                            <h4 className="text-xs font-bold text-white truncate group-hover:text-emerald-400 transition-colors">
+                                {adminUser?.name || 'Super Admin'}
+                            </h4>
+                            <p className="text-[10px] font-medium text-slate-400 truncate uppercase">
+                                {adminUser?.role || 'Administrator'}
+                            </p>
+                        </div>
+                    </Link>
 
                     <button
                         onClick={handleLogout}
-                        className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                        className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
                         title="Sign Out"
                     >
                         <LogOut size={16} />

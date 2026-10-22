@@ -7,6 +7,7 @@ import PromotedRoute from '../Models/PromotedRoute.js';
 import Offer from '../Models/Offer.js';
 import DriverOffer from '../Models/DriverOffer.js';
 import SystemSetting from '../Models/SystemSetting.js';
+import bcrypt from 'bcryptjs';
 import { getCashfreePayoutConfig, testCashfreePayoutConnection, executeCashfreeTransfer } from '../Utils/cashfreePayoutService.js';
 // Get list of drivers (with filter for pending/verified)
 export const getDrivers = async (req, res) => {
@@ -1590,3 +1591,93 @@ export const processCashfreeWithdrawalPayout = async (req, res) => {
         });
     }
 };
+
+// ─── ADMIN PROFILE & CREDENTIALS ─────────────────────────────────
+export const getAdminProfile = async (req, res) => {
+    try {
+        const admin = await User.findById(req.user._id).select('-password');
+        if (!admin) {
+            return res.status(404).json({ success: false, message: 'Admin account not found' });
+        }
+        res.json({ success: true, data: admin });
+    } catch (error) {
+        console.error('getAdminProfile error:', error);
+        res.status(500).json({ success: false, message: error.message || 'Failed to fetch admin profile' });
+    }
+};
+
+export const updateAdminProfile = async (req, res) => {
+    try {
+        const admin = await User.findById(req.user._id);
+        if (!admin) {
+            return res.status(404).json({ success: false, message: 'Admin account not found' });
+        }
+
+        const { name, email, phone, currentPassword, newPassword } = req.body;
+
+        // 1. Email update
+        if (email && email.trim().toLowerCase() !== (admin.email || '').toLowerCase()) {
+            const trimmedEmail = email.trim().toLowerCase();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(trimmedEmail)) {
+                return res.status(400).json({ success: false, message: 'Invalid email address format' });
+            }
+
+            const existingUser = await User.findOne({
+                email: trimmedEmail,
+                _id: { $ne: admin._id }
+            });
+            if (existingUser) {
+                return res.status(400).json({ success: false, message: 'This email is already in use by another user' });
+            }
+
+            admin.email = trimmedEmail;
+        }
+
+        // 2. Name update
+        if (name && typeof name === 'string' && name.trim()) {
+            admin.name = name.trim();
+        }
+
+        // 3. Phone update
+        if (phone !== undefined && typeof phone === 'string') {
+            admin.phone = phone.trim();
+        }
+
+        // 4. Password update
+        if (newPassword) {
+            if (!currentPassword) {
+                return res.status(400).json({ success: false, message: 'Current password is required to set a new password' });
+            }
+
+            if (newPassword.length < 6) {
+                return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long' });
+            }
+
+            if (admin.password) {
+                const isMatch = await bcrypt.compare(currentPassword, admin.password);
+                if (!isMatch) {
+                    return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+                }
+            }
+
+            const salt = await bcrypt.genSalt(10);
+            admin.password = await bcrypt.hash(newPassword, salt);
+        }
+
+        await admin.save();
+
+        const updatedData = admin.toObject();
+        delete updatedData.password;
+
+        res.json({
+            success: true,
+            message: 'Admin profile updated successfully',
+            data: updatedData
+        });
+    } catch (error) {
+        console.error('updateAdminProfile error:', error);
+        res.status(500).json({ success: false, message: error.message || 'Failed to update admin profile' });
+    }
+};
+

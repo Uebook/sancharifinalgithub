@@ -549,7 +549,7 @@ export const updateProfile = async (req, res) => {
     }
 
     // 2. Handle Text Fields
-    let { name, email, phone, ridePersonality, savedPlaces, emergencyContact } = req.body;
+    let { name, email, phone, ridePersonality, savedPlaces, emergencyContact, currentPassword, newPassword } = req.body;
 
     // If using form-data, arrays/objects might arrive as strings
     if (typeof ridePersonality === 'string') {
@@ -560,8 +560,33 @@ export const updateProfile = async (req, res) => {
     }
 
     if (name) user.name = name;
-    if (email) user.email = email;
+    if (email && email.trim().toLowerCase() !== (user.email || '').toLowerCase()) {
+      const trimmedEmail = email.trim().toLowerCase();
+      const existing = await User.findOne({ email: trimmedEmail, _id: { $ne: user._id } });
+      if (existing) {
+        return sendError(res, 400, 'This email is already in use by another account');
+      }
+      user.email = trimmedEmail;
+    }
     if (phone) user.phone = phone;
+
+    // Password change
+    if (newPassword) {
+      if (!currentPassword) {
+        return sendError(res, 400, 'Current password is required to set a new password');
+      }
+      if (newPassword.length < 6) {
+        return sendError(res, 400, 'New password must be at least 6 characters');
+      }
+      if (user.password) {
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+          return sendError(res, 400, 'Current password is incorrect');
+        }
+      }
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(newPassword, salt);
+    }
 
     // Update Passenger Specifics
     if (ridePersonality) user.ridePersonality = ridePersonality;
