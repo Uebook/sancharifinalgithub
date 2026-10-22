@@ -8,7 +8,8 @@ import {
     Dimensions,
     Platform,
     Alert,
-    PermissionsAndroid
+    PermissionsAndroid,
+    ActivityIndicator
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import BottomNavBar from '../Navigation/BottomNavBar';
@@ -32,7 +33,7 @@ import { getActiveRide } from '../../Services/rideService';
 import { GOOGLE_MAPS_API_KEY } from '../../Config/maps';
 import axios from 'axios';
 import GetLocation from 'react-native-get-location';
-import { getCurrentLocationAddress } from '../../Services/directionsService';
+import { getCurrentLocationAddress, getAddressFromCoords } from '../../Services/directionsService';
 import { promptForEnableLocationIfNeeded } from 'react-native-android-location-enabler';
 import SosModal from '../Common/SosModal';
 
@@ -55,10 +56,12 @@ const PassengerHomeScreen = () => {
     const [sosVisible, setSosVisible] = useState(false);
     const [pickupAddress, setPickupAddress] = useState('');
     const [pickupCoords, setPickupCoords] = useState<[number, number] | null>(null);
+    const [isLocating, setIsLocating] = useState(false);
     const pickupRef = useRef<GooglePlacesAutocompleteRef>(null);
     const mapRef = useRef<MapView>(null);
 
-    const handleCurrentLocation = async () => {
+    const handleCurrentLocation = async (silent = false) => {
+        setIsLocating(true);
         try {
             const res = await getCurrentLocationAddress();
             if (res) {
@@ -77,18 +80,27 @@ const PassengerHomeScreen = () => {
                 }
             }
         } catch (error: any) {
-            Alert.alert("Location Issue", error.message || "Could not fetch location.");
+            if (!silent) {
+                Alert.alert("Location Issue", error.message || "Could not fetch location.");
+            }
+        } finally {
+            setIsLocating(false);
         }
     };
 
     // Auto-detect user current location on screen mount
     React.useEffect(() => {
-        handleCurrentLocation();
+        handleCurrentLocation(true);
     }, []);
 
     // Auto-resume active ride logic
     useFocusEffect(
         useCallback(() => {
+            // Re-fetch user location if not yet resolved
+            if (!pickupCoords) {
+                handleCurrentLocation(true);
+            }
+
             const checkActive = async () => {
                 // Skip auto-resume if coming back manually (e.g., via Back button)
                 if ((route.params as any)?.manualReturn) {
@@ -168,6 +180,38 @@ const PassengerHomeScreen = () => {
                 zoomTapEnabled={true}
                 minZoomLevel={3}
                 maxZoomLevel={20}
+                showsUserLocation={true}
+                showsMyLocationButton={false}
+                followsUserLocation={!pickupCoords}
+                loadingEnabled={true}
+                onUserLocationChange={async (event) => {
+                    const coord = event.nativeEvent?.coordinate;
+                    if (coord && typeof coord.latitude === 'number' && typeof coord.longitude === 'number') {
+                        const { latitude, longitude } = coord;
+                        if (!pickupCoords || !pickupAddress) {
+                            setPickupCoords([longitude, latitude]);
+                            if (mapRef.current) {
+                                mapRef.current.animateToRegion({
+                                    latitude,
+                                    longitude,
+                                    latitudeDelta: 0.015,
+                                    longitudeDelta: 0.0121,
+                                }, 600);
+                            }
+                            try {
+                                const addr = await getAddressFromCoords(latitude, longitude);
+                                if (addr && addr !== 'Current Location') {
+                                    setPickupAddress(addr);
+                                    if (pickupRef.current) {
+                                        pickupRef.current.setAddressText(addr);
+                                    }
+                                }
+                            } catch (e) {
+                                console.log('Error reverse geocoding onUserLocationChange:', e);
+                            }
+                        }
+                    }
+                }}
                 initialRegion={pickupCoords ? {
                     latitude: pickupCoords[1],
                     longitude: pickupCoords[0],
@@ -180,8 +224,6 @@ const PassengerHomeScreen = () => {
                     latitudeDelta: 0.015,
                     longitudeDelta: 0.0121,
                 } : undefined}
-                showsUserLocation={true}
-                showsMyLocationButton={false}
             >
                 {pickupCoords && (
                     <Marker
@@ -256,14 +298,19 @@ const PassengerHomeScreen = () => {
                                     <View style={{ flex: 1, paddingRight: 10 }}>
                                         <Text style={styles.inputLabel}>PICKUP LOCATION</Text>
                                         <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>
-                                            {pickupAddress || 'Search Pickup Location'}
+                                            {pickupAddress || (isLocating ? 'Detecting your location...' : 'Search Pickup Location')}
                                         </Text>
                                     </View>
                                     <TouchableOpacity
                                         style={styles.inlineTargetButton}
-                                        onPress={handleCurrentLocation}
+                                        onPress={() => handleCurrentLocation(false)}
+                                        disabled={isLocating}
                                     >
-                                        <FontAwesomeIcon icon={faLocationCrosshairs} size={20} color="#10B981" />
+                                        {isLocating ? (
+                                            <ActivityIndicator size="small" color="#10B981" />
+                                        ) : (
+                                            <FontAwesomeIcon icon={faLocationCrosshairs} size={20} color="#10B981" />
+                                        )}
                                     </TouchableOpacity>
                                 </TouchableOpacity>
                                 <View style={[styles.divider, { zIndex: -1 }]} />

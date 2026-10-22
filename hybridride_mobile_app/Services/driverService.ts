@@ -6,8 +6,8 @@ export const driverService = {
         return response.data;
     },
 
-    toggleStatus: async () => {
-        const response = await apiClient.patch('/driver/status');
+    toggleStatus: async (isOnline?: boolean) => {
+        const response = await apiClient.patch('/driver/status', typeof isOnline === 'boolean' ? { isOnline } : {});
         return response.data;
     },
 

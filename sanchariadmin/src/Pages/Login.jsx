@@ -69,10 +69,15 @@ const Login = () => {
             }
         } catch (err) {
             console.error(err);
-            if (err.response?.status === 404) {
+            const serverMsg = err.response?.data?.message || err.response?.data?.error;
+            if (serverMsg) {
+                setError(serverMsg);
+            } else if (err.response?.status === 404) {
                 setError('API endpoint not found (404). Please verify VITE_API_BASE_URL.');
+            } else if (!err.response) {
+                setError('Network error. Unable to reach server. Please check your internet connection.');
             } else {
-                setError('Network error. Is the server running?');
+                setError(`Server error (${err.response.status}). Please try again.`);
             }
         } finally {
             setIsLoading(false);

@@ -26,7 +26,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import { GOOGLE_MAPS_API_KEY } from '../../Config/maps';
-import { getCoordsFromAddress, calculateTotalPathDistance } from '../../Services/directionsService';
+import { getCoordsFromAddress, calculateTotalPathDistance, getCurrentLocationAddress } from '../../Services/directionsService';
 import { driverService } from '../../Services/driverService';
 
 interface WaypointItem {

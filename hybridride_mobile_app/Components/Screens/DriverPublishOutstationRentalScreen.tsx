@@ -27,6 +27,7 @@ import {
 import { useAuth } from '../Context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import poolService from '../../Services/poolService';
+import { getCoordsFromAddress } from '../../Services/directionsService';
 
 // ─── Rate row component ───────────────────────────────────
 const RateRow = ({

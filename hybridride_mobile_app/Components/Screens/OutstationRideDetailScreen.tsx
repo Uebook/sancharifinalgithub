@@ -19,7 +19,7 @@ import {
     faSquare,
     faChair,
     faCar,
-    faShieldCheck,
+    faShieldHalved,
     faSnowflake,
     faLuggageCart,
     faUser,
@@ -177,7 +177,7 @@ const OutstationRideDetailScreen = () => {
                             </Text>
                         </View>
                         <View style={styles.featureChip}>
-                            <FontAwesomeIcon icon={faShieldCheck} size={14} color="#8B5CF6" style={{ marginRight: 6 }} />
+                            <FontAwesomeIcon icon={faShieldHalved} size={14} color="#8B5CF6" style={{ marginRight: 6 }} />
                             <Text style={styles.featureChipText}>Safety Insured</Text>
                         </View>
                     </View>

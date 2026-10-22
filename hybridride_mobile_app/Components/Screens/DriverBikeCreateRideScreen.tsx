@@ -175,14 +175,14 @@ const DriverBikeCreateRideScreen = () => {
                         </View>
                         <View style={styles.timeSelectedRow}>
                             <Text style={styles.timeValueText}>
-                                {selectedTime.split(' ')[0]}
+                                {(selectedTime.split(' ')[0] || '').split(':')[0] || '09'}
                             </Text>
                             <Text style={styles.timeColon}>:</Text>
                             <Text style={styles.timeValueText}>
-                                {selectedTime.split(' ')[1] || '15'}
+                                {(selectedTime.split(' ')[0] || '').split(':')[1] || '15'}
                             </Text>
                             <Text style={styles.timeAmpmText}>
-                                {selectedTime.split(' ')[2] || 'AM'}
+                                {selectedTime.split(' ')[1] || 'AM'}
                             </Text>
                         </View>
                         <View style={styles.timeWheelRow}>
@@ -290,6 +290,7 @@ const DriverBikeCreateRideScreen = () => {
                     setSelectedDate(formatted);
                     setShowCalendar(false);
                 }}
+                selectedDate={selectedDate}
             />
 
             {/* Time Picker Modal */}

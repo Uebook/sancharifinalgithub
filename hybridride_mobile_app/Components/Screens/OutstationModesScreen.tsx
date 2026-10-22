@@ -19,7 +19,7 @@ import {
     faArrowRight,
     faBus,
     faSuitcase,
-    faShieldCheck
+    faShieldHalved,
 } from '@fortawesome/free-solid-svg-icons';
 import poolService from '../../Services/poolService';
 

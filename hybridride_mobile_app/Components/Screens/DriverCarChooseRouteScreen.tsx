@@ -18,8 +18,9 @@ import {
     faCar,
     faRoute
 } from '@fortawesome/free-solid-svg-icons';
-import { fetchGoogleRoutes, getCoordsFromAddress, RouteOption } from '../../Services/directionsService';
+import { fetchGoogleRoutes, getCoordsFromAddress, getCurrentLocationAddress, RouteOption } from '../../Services/directionsService';
 import poolService from '../../Services/poolService';
+import DriverSeatPreferenceModal, { SeatPricingConfig, SeatDistributionConfig } from '../Common/DriverSeatPreferenceModal';
 
 const DriverCarChooseRouteScreen = () => {
     const navigation = useNavigation();
@@ -30,6 +31,22 @@ const DriverCarChooseRouteScreen = () => {
     const destination = (route.params as any)?.destination || 'Drop-off location';
     const seats = (route.params as any)?.seats || 3;
     const pricePerSeat = (route.params as any)?.pricePerSeat || 90;
+
+    const initialPricing: SeatPricingConfig = (route.params as any)?.seatPricing || {
+        front: 105,
+        middle: Number(pricePerSeat) || 90,
+        back: 80,
+    };
+    const initialDistribution: SeatDistributionConfig = (route.params as any)?.seatDistribution || {
+        front: 1,
+        middle: Math.max(1, Number(seats) - 1),
+        back: 0,
+    };
+
+    const [currentSeatPricing, setCurrentSeatPricing] = useState<SeatPricingConfig>(initialPricing);
+    const [currentSeatDistribution, setCurrentSeatDistribution] = useState<SeatDistributionConfig>(initialDistribution);
+    const [totalSeats, setTotalSeats] = useState<number>(Number(seats) || 3);
+    const [showSeatModal, setShowSeatModal] = useState(false);
 
     const [originCoords, setOriginCoords] = useState<{ latitude: number; longitude: number } | null>(null);
     const [destCoords, setDestCoords] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -97,8 +114,13 @@ const DriverCarChooseRouteScreen = () => {
                 scheduledTime,
                 vehicle: 'Car Pool Vehicle',
                 vehicleType: 'CAR',
-                totalSeats: Number(seats),
-                pricePerSeat: Number(pricePerSeat),
+                totalSeats: Number(totalSeats),
+                pricePerSeat: Number(currentSeatPricing.middle || pricePerSeat),
+                seatPricing: {
+                    front: Number(currentSeatPricing.front || pricePerSeat),
+                    middle: Number(currentSeatPricing.middle || pricePerSeat),
+                    back: Number(currentSeatPricing.back || pricePerSeat),
+                },
                 route: {
                     distance: activeRoute.distanceKm,
                     duration: activeRoute.durationMin,
@@ -239,6 +261,21 @@ const DriverCarChooseRouteScreen = () => {
                     })
                 )}
 
+                {/* Seat Preference Pill Button */}
+                <TouchableOpacity
+                    style={styles.seatPillBar}
+                    onPress={() => setShowSeatModal(true)}
+                    activeOpacity={0.8}
+                >
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <FontAwesomeIcon icon={faCar} size={13} color="#10B981" style={{ marginRight: 6 }} />
+                        <Text style={styles.seatPillText}>
+                            {totalSeats} Seats · Front: ₹{currentSeatPricing.front} · Mid: ₹{currentSeatPricing.middle}
+                        </Text>
+                    </View>
+                    <Text style={styles.seatPillEdit}>EDIT SEATS ›</Text>
+                </TouchableOpacity>
+
                 {/* Confirm & Publish Button */}
                 <TouchableOpacity
                     style={[styles.confirmBtn, { backgroundColor: activeColor }]}
@@ -258,6 +295,22 @@ const DriverCarChooseRouteScreen = () => {
                     )}
                 </TouchableOpacity>
             </View>
+
+            {/* Seat Preference Modal */}
+            <DriverSeatPreferenceModal
+                visible={showSeatModal}
+                onClose={() => setShowSeatModal(false)}
+                basePrice={Number(pricePerSeat)}
+                initialTotalSeats={totalSeats}
+                maxCapacity={4}
+                initialPricing={currentSeatPricing}
+                initialDistribution={currentSeatDistribution}
+                onConfirm={(data) => {
+                    setCurrentSeatPricing(data.pricing);
+                    setCurrentSeatDistribution(data.distribution);
+                    setTotalSeats(data.totalSeats);
+                }}
+            />
         </SafeAreaView>
     );
 };
@@ -416,6 +469,28 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontWeight: '800',
         fontSize: 15,
+    },
+    seatPillBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#0F172A',
+        borderWidth: 1,
+        borderColor: '#334155',
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        marginBottom: 10,
+    },
+    seatPillText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#E2E8F0',
+    },
+    seatPillEdit: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#10B981',
     },
 });
 

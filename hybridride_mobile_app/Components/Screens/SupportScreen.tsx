@@ -20,7 +20,10 @@ import {
     faFileInvoice,
     faShieldHalved,
     faCircleQuestion,
-    faMessage
+    faMessage,
+    faPhone,
+    faEnvelope,
+    faPlay,
 } from '@fortawesome/free-solid-svg-icons';
 import BottomNavBar from '../Navigation/BottomNavBar';
 import DriverBottomNavBar from '../Navigation/DriverBottomNavBar';
@@ -150,6 +153,60 @@ const SupportScreen = () => {
                             </View>
                         ))
                     )}
+
+                    {/* Direct Contact & Guides */}
+                    <Text style={[styles.sectionHeader, { marginTop: 24, marginBottom: 12 }, isDriver && styles.darkSubtext]}>CONTACT & HELP DESK</Text>
+
+                    <View style={[styles.menuCard, isDriver && styles.darkCard]}>
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => Linking.openURL(`tel:${CONFIG.SUPPORT_PHONE}`)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.menuIconBox}>
+                                <FontAwesomeIcon icon={faPhone} size={18} color="#10B981" />
+                            </View>
+                            <View style={styles.menuContent}>
+                                <Text style={[styles.menuTitle, isDriver && styles.darkText]}>Call / WhatsApp Support</Text>
+                                <Text style={[styles.menuSubtitle, isDriver && styles.darkSubtext]}>+91 {CONFIG.SUPPORT_PHONE}</Text>
+                            </View>
+                            <FontAwesomeIcon icon={faChevronRight} size={14} color={isDriver ? "#475569" : "#D1D5DB"} />
+                        </TouchableOpacity>
+
+                        <View style={[styles.divider, isDriver && { backgroundColor: '#1E293B' }]} />
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => Linking.openURL(`mailto:${CONFIG.SUPPORT_EMAIL}?subject=Help%20Support`)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.menuIconBox}>
+                                <FontAwesomeIcon icon={faEnvelope} size={18} color="#10B981" />
+                            </View>
+                            <View style={styles.menuContent}>
+                                <Text style={[styles.menuTitle, isDriver && styles.darkText]}>Email Support</Text>
+                                <Text style={[styles.menuSubtitle, isDriver && styles.darkSubtext]}>{CONFIG.SUPPORT_EMAIL}</Text>
+                            </View>
+                            <FontAwesomeIcon icon={faChevronRight} size={14} color={isDriver ? "#475569" : "#D1D5DB"} />
+                        </TouchableOpacity>
+
+                        <View style={[styles.divider, isDriver && { backgroundColor: '#1E293B' }]} />
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => Linking.openURL(CONFIG.YOUTUBE_CHANNEL_URL)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.menuIconBox}>
+                                <FontAwesomeIcon icon={faPlay} size={16} color="#EF4444" />
+                            </View>
+                            <View style={styles.menuContent}>
+                                <Text style={[styles.menuTitle, isDriver && styles.darkText]}>SanchariAppOfficial - YouTube</Text>
+                                <Text style={[styles.menuSubtitle, isDriver && styles.darkSubtext]}>How earnings work &amp; app tutorials</Text>
+                            </View>
+                            <FontAwesomeIcon icon={faChevronRight} size={14} color={isDriver ? "#475569" : "#D1D5DB"} />
+                        </TouchableOpacity>
+                    </View>
 
                     {/* General Support */}
                     <Text style={[styles.sectionHeader, { marginTop: 24, marginBottom: 12 }, isDriver && styles.darkSubtext]}>GENERAL SUPPORT</Text>

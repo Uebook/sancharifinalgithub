@@ -30,9 +30,12 @@ import {
     faShieldHalved,
     faArrowRightFromBracket,
     faClock,
+    faPhone,
+    faEnvelope,
 } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../Context/AuthContext';
 import { driverService } from '../../Services/driverService';
+import { CONFIG } from '../../Constants/Config';
 
 const { width } = Dimensions.get('window');
 
@@ -45,6 +48,11 @@ const DriverPendingApprovalScreen = () => {
     const paramStatus = (route.params as any)?.status;
     const approvalStatus: 'pending' | 'rejected' | 'approved' = 
         paramStatus || user?.driverApprovalStatus || 'pending';
+
+    // Dynamic verification checks (only mark verified if approved or explicit status true)
+    const isAadhaarVerified = approvalStatus === 'approved' || !!user?.verificationStatus?.idCard;
+    const isDlVerified = approvalStatus === 'approved' || !!(user?.verificationStatus as any)?.drivingLicense;
+    const isRcVerified = approvalStatus === 'approved' || !!(user?.verificationStatus as any)?.rc;
 
     const [refreshing, setRefreshing] = useState(false);
     const [selectedServiceModes, setSelectedServiceModes] = useState(false);
@@ -90,10 +98,42 @@ const DriverPendingApprovalScreen = () => {
     };
 
     const handleChatSupport = () => {
-        // Open WhatsApp or support screen
-        const supportUrl = 'https://wa.me/919999999999?text=Hi%20Sanchari%20Support,%20I%20need%20help%20with%20my%20driver%20onboarding%20verification.';
-        Linking.openURL(supportUrl).catch(() => {
-            (navigation as any).navigate('Support');
+        Alert.alert(
+            "Contact Sanchari Support",
+            `We are here to help you 24/7.\n\n• Phone: ${CONFIG.SUPPORT_PHONE}\n• Email: ${CONFIG.SUPPORT_EMAIL}`,
+            [
+                {
+                    text: "WhatsApp Chat",
+                    onPress: () => {
+                        const supportUrl = `https://wa.me/91${CONFIG.SUPPORT_PHONE}?text=Hi%20Sanchari%20Support,%20I%20need%20help%20with%20my%20driver%20onboarding%20verification.`;
+                        Linking.openURL(supportUrl).catch(() => {
+                            Linking.openURL(`tel:${CONFIG.SUPPORT_PHONE}`);
+                        });
+                    }
+                },
+                {
+                    text: `Call (${CONFIG.SUPPORT_PHONE})`,
+                    onPress: () => Linking.openURL(`tel:${CONFIG.SUPPORT_PHONE}`)
+                },
+                {
+                    text: "Email Support",
+                    onPress: () => Linking.openURL(`mailto:${CONFIG.SUPPORT_EMAIL}?subject=Driver%20Onboarding%20Support`)
+                },
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                }
+            ]
+        );
+    };
+
+    const handleHowEarningsWork = () => {
+        const url = CONFIG.YOUTUBE_CHANNEL_URL || 'https://www.youtube.com/@SanchariAppOfficial';
+        Linking.openURL(url).catch(() => {
+            Alert.alert(
+                "Partner Earnings Guide",
+                "Watch driver guides on our YouTube channel @SanchariAppOfficial.\n\n1. Instant Rides: Earn 85% per trip\n2. Pool Rides: Fill up to 3 seats\n3. Daily Payouts via UPI at 11 PM"
+            );
         });
     };
 
@@ -179,13 +219,15 @@ const DriverPendingApprovalScreen = () => {
                 {/* Aadhaar */}
                 <View style={styles.docRow}>
                     <View style={styles.docLeft}>
-                        <View style={styles.docIconCheck}>
-                            <FontAwesomeIcon icon={faCheck} size={10} color="#10B981" />
+                        <View style={isAadhaarVerified ? styles.docIconCheck : styles.docIconReviewing}>
+                            <FontAwesomeIcon icon={isAadhaarVerified ? faCheck : faClock} size={10} color={isAadhaarVerified ? "#10B981" : "#F59E0B"} />
                         </View>
                         <Text style={styles.docName}>Aadhaar</Text>
                     </View>
-                    <View style={styles.badgeVerified}>
-                        <Text style={styles.badgeVerifiedText}>Verified</Text>
+                    <View style={isAadhaarVerified ? styles.badgeVerified : styles.badgeReviewing}>
+                        <Text style={isAadhaarVerified ? styles.badgeVerifiedText : styles.badgeReviewingText}>
+                            {isAadhaarVerified ? 'Verified' : 'Reviewing'}
+                        </Text>
                     </View>
                 </View>
 
@@ -194,13 +236,15 @@ const DriverPendingApprovalScreen = () => {
                 {/* Driving Licence */}
                 <View style={styles.docRow}>
                     <View style={styles.docLeft}>
-                        <View style={styles.docIconCheck}>
-                            <FontAwesomeIcon icon={faCheck} size={10} color="#10B981" />
+                        <View style={isDlVerified ? styles.docIconCheck : styles.docIconReviewing}>
+                            <FontAwesomeIcon icon={isDlVerified ? faCheck : faClock} size={10} color={isDlVerified ? "#10B981" : "#F59E0B"} />
                         </View>
                         <Text style={styles.docName}>Driving licence</Text>
                     </View>
-                    <View style={styles.badgeVerified}>
-                        <Text style={styles.badgeVerifiedText}>Verified</Text>
+                    <View style={isDlVerified ? styles.badgeVerified : styles.badgeReviewing}>
+                        <Text style={isDlVerified ? styles.badgeVerifiedText : styles.badgeReviewingText}>
+                            {isDlVerified ? 'Verified' : 'Reviewing'}
+                        </Text>
                     </View>
                 </View>
 
@@ -209,13 +253,15 @@ const DriverPendingApprovalScreen = () => {
                 {/* Vehicle RC */}
                 <View style={styles.docRow}>
                     <View style={styles.docLeft}>
-                        <View style={styles.docIconReviewing}>
-                            <FontAwesomeIcon icon={faClock} size={10} color="#F59E0B" />
+                        <View style={isRcVerified ? styles.docIconCheck : styles.docIconReviewing}>
+                            <FontAwesomeIcon icon={isRcVerified ? faCheck : faClock} size={10} color={isRcVerified ? "#10B981" : "#F59E0B"} />
                         </View>
                         <Text style={styles.docName}>Vehicle RC</Text>
                     </View>
-                    <View style={styles.badgeReviewing}>
-                        <Text style={styles.badgeReviewingText}>Reviewing</Text>
+                    <View style={isRcVerified ? styles.badgeVerified : styles.badgeReviewing}>
+                        <Text style={isRcVerified ? styles.badgeVerifiedText : styles.badgeReviewingText}>
+                            {isRcVerified ? 'Verified' : 'Reviewing'}
+                        </Text>
                     </View>
                 </View>
             </View>
@@ -262,19 +308,41 @@ const DriverPendingApprovalScreen = () => {
                 <TouchableOpacity 
                     style={styles.taskCard}
                     activeOpacity={0.8}
-                    onPress={() => {
-                        Alert.alert("Partner Earnings Guide", "1. Instant Rides: Earn 85% per trip\n2. Pool Rides: Fill up to 3 seats\n3. Daily Payouts via UPI at 11 PM");
-                    }}
+                    onPress={handleHowEarningsWork}
                 >
                     <View style={styles.taskIconSquare}>
-                        <FontAwesomeIcon icon={faPlay} size={11} color="#94A3B8" />
+                        <FontAwesomeIcon icon={faPlay} size={11} color="#EF4444" />
                     </View>
                     <View style={styles.taskTextCol}>
                         <Text style={styles.taskTitle}>How earnings work</Text>
-                        <Text style={styles.taskSubtitle}>2 min video</Text>
+                        <Text style={styles.taskSubtitle}>Watch on YouTube · SanchariAppOfficial</Text>
                     </View>
                     <FontAwesomeIcon icon={faChevronRight} size={12} color="#64748B" />
                 </TouchableOpacity>
+            </View>
+
+            {/* Support Info Card */}
+            <View style={styles.supportContactCard}>
+                <Text style={styles.supportContactTitle}>Direct Support Contact</Text>
+                <View style={styles.supportButtonsRow}>
+                    <TouchableOpacity 
+                        style={styles.supportPillButton} 
+                        onPress={() => Linking.openURL(`tel:${CONFIG.SUPPORT_PHONE}`)}
+                        activeOpacity={0.8}
+                    >
+                        <FontAwesomeIcon icon={faPhone} size={11} color="#10B981" style={{ marginRight: 6 }} />
+                        <Text style={styles.supportPillText}>{CONFIG.SUPPORT_PHONE}</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        style={styles.supportPillButton} 
+                        onPress={() => Linking.openURL(`mailto:${CONFIG.SUPPORT_EMAIL}?subject=Driver%20Support`)}
+                        activeOpacity={0.8}
+                    >
+                        <FontAwesomeIcon icon={faEnvelope} size={11} color="#10B981" style={{ marginRight: 6 }} />
+                        <Text style={styles.supportPillText}>{CONFIG.SUPPORT_EMAIL}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Bottom Actions */}
@@ -342,18 +410,20 @@ const DriverPendingApprovalScreen = () => {
                     </View>
                 </View>
 
-                {/* Verified Documents */}
+                {/* Document Status */}
                 <View style={styles.docChecklistCard}>
                     {/* Aadhaar */}
                     <View style={styles.docRow}>
                         <View style={styles.docLeft}>
-                            <View style={styles.docIconCheck}>
-                                <FontAwesomeIcon icon={faCheck} size={10} color="#10B981" />
+                            <View style={isAadhaarVerified ? styles.docIconCheck : styles.docIconReviewing}>
+                                <FontAwesomeIcon icon={isAadhaarVerified ? faCheck : faClock} size={10} color={isAadhaarVerified ? "#10B981" : "#F59E0B"} />
                             </View>
                             <Text style={styles.docName}>Aadhaar</Text>
                         </View>
-                        <View style={styles.badgeVerified}>
-                            <Text style={styles.badgeVerifiedText}>Verified</Text>
+                        <View style={isAadhaarVerified ? styles.badgeVerified : styles.badgeReviewing}>
+                            <Text style={isAadhaarVerified ? styles.badgeVerifiedText : styles.badgeReviewingText}>
+                                {isAadhaarVerified ? 'Verified' : 'Reviewing'}
+                            </Text>
                         </View>
                     </View>
 
@@ -362,13 +432,15 @@ const DriverPendingApprovalScreen = () => {
                     {/* Driving Licence */}
                     <View style={styles.docRow}>
                         <View style={styles.docLeft}>
-                            <View style={styles.docIconCheck}>
-                                <FontAwesomeIcon icon={faCheck} size={10} color="#10B981" />
+                            <View style={isDlVerified ? styles.docIconCheck : styles.docIconReviewing}>
+                                <FontAwesomeIcon icon={isDlVerified ? faCheck : faClock} size={10} color={isDlVerified ? "#10B981" : "#F59E0B"} />
                             </View>
                             <Text style={styles.docName}>Driving licence</Text>
                         </View>
-                        <View style={styles.badgeVerified}>
-                            <Text style={styles.badgeVerifiedText}>Verified</Text>
+                        <View style={isDlVerified ? styles.badgeVerified : styles.badgeReviewing}>
+                            <Text style={isDlVerified ? styles.badgeVerifiedText : styles.badgeReviewingText}>
+                                {isDlVerified ? 'Verified' : 'Reviewing'}
+                            </Text>
                         </View>
                     </View>
                 </View>
@@ -398,6 +470,30 @@ const DriverPendingApprovalScreen = () => {
                         <FontAwesomeIcon icon={faFolderOpen} size={15} color="#0F172A" style={{ marginRight: 8 }} />
                         <Text style={styles.yellowReuploadButtonText}>Re-upload Vehicle RC</Text>
                     </TouchableOpacity>
+                </View>
+
+                {/* Support Info Card */}
+                <View style={styles.supportContactCard}>
+                    <Text style={styles.supportContactTitle}>Direct Support Contact</Text>
+                    <View style={styles.supportButtonsRow}>
+                        <TouchableOpacity 
+                            style={styles.supportPillButton} 
+                            onPress={() => Linking.openURL(`tel:${CONFIG.SUPPORT_PHONE}`)}
+                            activeOpacity={0.8}
+                        >
+                            <FontAwesomeIcon icon={faPhone} size={11} color="#10B981" style={{ marginRight: 6 }} />
+                            <Text style={styles.supportPillText}>{CONFIG.SUPPORT_PHONE}</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.supportPillButton} 
+                            onPress={() => Linking.openURL(`mailto:${CONFIG.SUPPORT_EMAIL}?subject=Driver%20Verification%20Appeal`)}
+                            activeOpacity={0.8}
+                        >
+                            <FontAwesomeIcon icon={faEnvelope} size={11} color="#10B981" style={{ marginRight: 6 }} />
+                            <Text style={styles.supportPillText}>{CONFIG.SUPPORT_EMAIL}</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* Outlined Chat Support Button */}
@@ -974,6 +1070,48 @@ const styles = StyleSheet.create({
         color: '#64748B',
         fontSize: 13,
         fontWeight: '600',
+    },
+
+    // --- Support Contact Card ---
+    supportContactCard: {
+        width: '100%',
+        backgroundColor: '#131B2A',
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#1E293B',
+        marginBottom: 16,
+    },
+    supportContactTitle: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#94A3B8',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 10,
+    },
+    supportButtonsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    supportPillButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#1E293B',
+        paddingVertical: 9,
+        paddingHorizontal: 8,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#334155',
+    },
+    supportPillText: {
+        color: '#F8FAFC',
+        fontSize: 11,
+        fontWeight: '700',
     },
 });
 

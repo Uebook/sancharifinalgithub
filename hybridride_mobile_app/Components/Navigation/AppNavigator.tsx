@@ -62,7 +62,7 @@ import DriverOutstationBoardingPointsScreen from '../Screens/DriverOutstationBoa
 import DriverOutstationLocationSearchScreen from '../Screens/DriverOutstationLocationSearchScreen';
 import DriverRentalRequestScreen from '../Screens/DriverRentalRequestScreen';
 import DriverRentalInProgressScreen from '../Screens/DriverRentalInProgressScreen';
-// import DriverPublishOutstationRentalScreen from '../Screens/DriverPublishOutstationRentalScreen'; // Dynamically required below
+import DriverPublishOutstationRentalScreen from '../Screens/DriverPublishOutstationRentalScreen';
 import DriverMyTripsScreen from '../Screens/DriverMyTripsScreen';
 import DriverProfileScreen from '../Screens/DriverProfileScreen';
 // import DriverProfileMyTripsScreen from '../Screens/DriverProfileMyTripsScreen'; // Dynamically required below
@@ -132,7 +132,7 @@ const AppNavigator = () => {
                         <Stack.Screen name="DriverPublishOutstationPool" component={DriverPublishOutstationPoolScreen} />
                         <Stack.Screen name="DriverOutstationBoardingPoints" component={DriverOutstationBoardingPointsScreen} />
                         <Stack.Screen name="DriverOutstationLocationSearch" component={DriverOutstationLocationSearchScreen} />
-                        <Stack.Screen name="DriverPublishOutstationRental" component={require('../Screens/DriverPublishOutstationRentalScreen').default} />
+                        <Stack.Screen name="DriverPublishOutstationRental" component={DriverPublishOutstationRentalScreen} />
                         <Stack.Screen name="DriverRentalRequest" component={DriverRentalRequestScreen} />
                         <Stack.Screen name="DriverRentalInProgress" component={DriverRentalInProgressScreen} />
                         <Stack.Screen name="DriverMyTrips" component={DriverMyTripsScreen} />

@@ -23,9 +23,11 @@ import {
     faVenus,
     faLocationDot,
     faChevronRight,
+    faCar,
 } from '@fortawesome/free-solid-svg-icons';
 import CalendarModal from '../Common/CalendarModal';
 import TimePickerModal from '../Common/TimePickerModal';
+import DriverSeatPreferenceModal, { SeatPricingConfig, SeatDistributionConfig } from '../Common/DriverSeatPreferenceModal';
 import { useAuth } from '../Context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import poolService from '../../Services/poolService';
@@ -107,6 +109,19 @@ const DriverPublishOutstationPoolScreen = () => {
     // ── Fare ───────────────────────────────────────────────
     const [farePerSeat, setFarePerSeat] = useState(450);
 
+    // ── Seat Pricing & Distribution ────────────────────────
+    const [seatPricing, setSeatPricing] = useState<SeatPricingConfig>({
+        front: 520,
+        middle: 450,
+        back: 400,
+    });
+    const [seatDistribution, setSeatDistribution] = useState<SeatDistributionConfig>({
+        front: 1,
+        middle: 2,
+        back: 0,
+    });
+    const [showSeatModal, setShowSeatModal] = useState(false);
+
     // ── Date / Time ────────────────────────────────────────
     const [showCalendar, setShowCalendar] = useState(false);
     const [selectedDate, setSelectedDate] = useState('Sat, 26 July');
@@ -158,9 +173,9 @@ const DriverPublishOutstationPoolScreen = () => {
                 totalSeats: selectedSeats,
                 pricePerSeat: farePerSeat,
                 seatPricing: {
-                    front: farePerSeat,
-                    middle: farePerSeat,
-                    back: farePerSeat,
+                    front: seatPricing.front,
+                    middle: seatPricing.middle,
+                    back: seatPricing.back,
                 },
                 preferences: {
                     womenOnly: hasLadiesSeat,
@@ -328,7 +343,7 @@ const DriverPublishOutstationPoolScreen = () => {
                             <Text style={styles.fareRupee}>₹</Text>
                         </View>
                         <View style={styles.fareInfo}>
-                            <Text style={styles.fareLabel}>FARE PER SEAT</Text>
+                            <Text style={styles.fareLabel}>BASE FARE PER SEAT</Text>
                             <Text style={styles.fareValue}>
                                 ₹{farePerSeat}{' '}
                                 <Text style={styles.fareSuggested}>Sanchari suggested</Text>
@@ -340,17 +355,86 @@ const DriverPublishOutstationPoolScreen = () => {
                         <View style={styles.fareControls}>
                             <TouchableOpacity
                                 style={styles.fareBtn}
-                                onPress={() => setFarePerSeat(prev => Math.max(50, prev - 10))}
+                                onPress={() => {
+                                    const next = Math.max(50, farePerSeat - 10);
+                                    setFarePerSeat(next);
+                                    setSeatPricing(p => ({
+                                        front: Math.round(next * 1.15),
+                                        middle: next,
+                                        back: Math.max(50, Math.round(next * 0.9)),
+                                    }));
+                                }}
                             >
                                 <Text style={styles.fareBtnText}>−</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.fareBtn}
-                                onPress={() => setFarePerSeat(prev => prev + 10)}
+                                onPress={() => {
+                                    const next = farePerSeat + 10;
+                                    setFarePerSeat(next);
+                                    setSeatPricing(p => ({
+                                        front: Math.round(next * 1.15),
+                                        middle: next,
+                                        back: Math.max(50, Math.round(next * 0.9)),
+                                    }));
+                                }}
                             >
                                 <Text style={styles.fareBtnText}>+</Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                </View>
+
+                {/* ── Seat Preferences & Row Pricing ── */}
+                <View style={styles.card}>
+                    <View style={styles.seatPrefHeaderRow}>
+                        <View>
+                            <Text style={styles.cardSectionTitle}>SEAT PREFERENCES & ROW PRICING</Text>
+                            <Text style={styles.seatPrefSubtitle}>
+                                Car layout pricing · Front, Middle & Back rows
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => setShowSeatModal(true)}
+                            style={styles.seatPrefCustomizeBtn}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.seatPrefCustomizeText}>Customize ›</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.seatPrefPillRow}>
+                        <TouchableOpacity
+                            style={styles.outstationSeatPill}
+                            onPress={() => setShowSeatModal(true)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.outstationSeatRowTitle}>FRONT ROW</Text>
+                            <Text style={styles.outstationSeatRowPrice}>₹{seatPricing.front}</Text>
+                            <Text style={styles.outstationSeatRowCount}>{seatDistribution.front} seat</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.outstationSeatPill}
+                            onPress={() => setShowSeatModal(true)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.outstationSeatRowTitle}>MIDDLE ROW</Text>
+                            <Text style={styles.outstationSeatRowPrice}>₹{seatPricing.middle}</Text>
+                            <Text style={styles.outstationSeatRowCount}>{seatDistribution.middle} seats</Text>
+                        </TouchableOpacity>
+
+                        {seatDistribution.back > 0 && (
+                            <TouchableOpacity
+                                style={styles.outstationSeatPill}
+                                onPress={() => setShowSeatModal(true)}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.outstationSeatRowTitle}>BACK ROW</Text>
+                                <Text style={styles.outstationSeatRowPrice}>₹{seatPricing.back}</Text>
+                                <Text style={styles.outstationSeatRowCount}>{seatDistribution.back} seats</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
 
@@ -455,6 +539,22 @@ const DriverPublishOutstationPoolScreen = () => {
                     setShowTimePicker(false);
                 }}
                 selectedTime={selectedTime}
+            />
+
+            {/* ── Seat Preference Modal ── */}
+            <DriverSeatPreferenceModal
+                visible={showSeatModal}
+                onClose={() => setShowSeatModal(false)}
+                basePrice={farePerSeat}
+                initialTotalSeats={selectedSeats}
+                maxCapacity={Number(maxCapacity) || 4}
+                initialPricing={seatPricing}
+                initialDistribution={seatDistribution}
+                onConfirm={(data) => {
+                    setSeatPricing(data.pricing);
+                    setSeatDistribution(data.distribution);
+                    setSelectedSeats(data.totalSeats);
+                }}
             />
         </SafeAreaView>
     );
@@ -872,6 +972,62 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: '#0D0D1A',
         letterSpacing: 0.2,
+    },
+    seatPrefHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    seatPrefSubtitle: {
+        fontSize: 11,
+        color: '#94A3B8',
+        marginTop: 2,
+    },
+    seatPrefCustomizeBtn: {
+        backgroundColor: '#7C3AED20',
+        borderColor: '#7C3AED',
+        borderWidth: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    seatPrefCustomizeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#A78BFA',
+    },
+    seatPrefPillRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    outstationSeatPill: {
+        flex: 1,
+        backgroundColor: '#131326',
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        borderWidth: 1,
+        borderColor: '#2D2D45',
+        alignItems: 'center',
+    },
+    outstationSeatRowTitle: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#94A3B8',
+        letterSpacing: 0.8,
+        marginBottom: 3,
+    },
+    outstationSeatRowPrice: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#10B981',
+        marginBottom: 2,
+    },
+    outstationSeatRowCount: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#CBD5E1',
     },
 });
 

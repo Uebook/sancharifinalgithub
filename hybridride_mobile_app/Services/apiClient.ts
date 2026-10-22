@@ -1,11 +1,11 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Vercel Backend Production URL
-const VERCEL_API_URL = process.env.API_URL || 'https://sancharibackend.vercel.app/api';
+// Production & Local Backend URLs
+const PROD_API_URL = process.env.API_URL || 'https://api.sanchari.io/api';
 const LOCAL_API_URL = 'http://10.0.2.2:5001/api';
 
-const BASE_URL = VERCEL_API_URL;
+const BASE_URL = PROD_API_URL;
 
 const apiClient = axios.create({
     baseURL: BASE_URL,

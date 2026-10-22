@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -31,7 +31,10 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import CalendarModal from '../Common/CalendarModal';
 import TimePickerModal from '../Common/TimePickerModal';
+import DriverSeatPreferenceModal, { SeatPricingConfig, SeatDistributionConfig } from '../Common/DriverSeatPreferenceModal';
+import { Alert } from 'react-native';
 import { useAuth } from '../Context/AuthContext';
+import { driverService } from '../../Services/driverService';
 
 const DriverCarCreateRideScreen = () => {
     const navigation = useNavigation();
@@ -50,8 +53,19 @@ const DriverCarCreateRideScreen = () => {
     const [luggageSpace, setLuggageSpace] = useState(false);
     const [ladiesSeat, setLadiesSeat] = useState(true);
 
-    // Fare state
+    // Fare & Seat Preference Pricing
     const [baseFare, setBaseFare] = useState(90);
+    const [showSeatModal, setShowSeatModal] = useState(false);
+    const [seatPricing, setSeatPricing] = useState<SeatPricingConfig>({
+        front: 105,
+        middle: 90,
+        back: 80,
+    });
+    const [seatDistribution, setSeatDistribution] = useState<SeatDistributionConfig>({
+        front: 1,
+        middle: 2,
+        back: 0,
+    });
 
     const [showCalendar, setShowCalendar] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
@@ -60,7 +74,7 @@ const DriverCarCreateRideScreen = () => {
         user?.driverDetails?.vehicle?.model ? `${user?.driverDetails?.vehicle?.make || ''} ${user?.driverDetails?.vehicle?.model}`.trim() : 'Car Pool Vehicle'
     );
     const [vehiclePlate, setVehiclePlate] = useState(
-        user?.driverDetails?.vehicle?.plateNumber || user?.driverDetails?.vehicle?.number || 'TS Vehicle'
+        user?.driverDetails?.vehicle?.plateNumber || (user?.driverDetails?.vehicle as any)?.number || 'TS Vehicle'
     );
 
     useEffect(() => {
@@ -331,6 +345,45 @@ const DriverCarCreateRideScreen = () => {
                     </View>
                 </View>
 
+                {/* Seat Preference & Row Pricing Card */}
+                <TouchableOpacity
+                    style={styles.seatPricingCard}
+                    onPress={() => setShowSeatModal(true)}
+                    activeOpacity={0.85}
+                >
+                    <View style={styles.seatPricingHeader}>
+                        <View style={styles.seatPricingTitleRow}>
+                            <FontAwesomeIcon icon={faCar} size={15} color="#10B981" style={{ marginRight: 8 }} />
+                            <Text style={styles.seatPricingTitleText}>SEAT PREFERENCES & ROW PRICING</Text>
+                        </View>
+                        <Text style={styles.seatPricingCustomizeText}>CUSTOMIZE ›</Text>
+                    </View>
+
+                    <View style={styles.rowPricingBadges}>
+                        <View style={styles.rowBadge}>
+                            <Text style={styles.rowBadgeLabel}>FRONT ROW</Text>
+                            <Text style={styles.rowBadgePrice}>₹{seatPricing.front}</Text>
+                            <Text style={styles.rowBadgeSeats}>{seatDistribution.front} seat</Text>
+                        </View>
+                        <View style={styles.rowBadge}>
+                            <Text style={styles.rowBadgeLabel}>MIDDLE ROW</Text>
+                            <Text style={styles.rowBadgePrice}>₹{seatPricing.middle}</Text>
+                            <Text style={styles.rowBadgeSeats}>{seatDistribution.middle} seats</Text>
+                        </View>
+                        {seatDistribution.back > 0 && (
+                            <View style={styles.rowBadge}>
+                                <Text style={styles.rowBadgeLabel}>BACK ROW</Text>
+                                <Text style={styles.rowBadgePrice}>₹{seatPricing.back}</Text>
+                                <Text style={styles.rowBadgeSeats}>{seatDistribution.back} seats</Text>
+                            </View>
+                        )}
+                    </View>
+
+                    <Text style={styles.seatPricingSubNote}>
+                        Tap to change per-row pricing or vehicle interior layout
+                    </Text>
+                </TouchableOpacity>
+
                 {/* Commute Prompt Card */}
                 <View style={styles.plannedPromptCard}>
                     <Text style={styles.plannedPromptTitle}>Daily office commute?</Text>
@@ -354,30 +407,55 @@ const DriverCarCreateRideScreen = () => {
                 </View>
 
                 <Text style={styles.summaryText}>
-                    {seatsOffering} seats · {acRide ? 'AC' : 'Non-AC'} · {ladiesSeat ? '1 ladies seat' : 'All seats'} · ₹{totalFarePerSeat}/seat · Now
+                    {seatsOffering} seats · Front ₹{seatPricing.front} · Mid ₹{seatPricing.middle} · {acRide ? 'AC' : 'Non-AC'}
                 </Text>
 
                 <TouchableOpacity
                     style={styles.createBtn}
                     onPress={() => {
-                        (navigation as any).navigate('DriverCarChooseRoute', {
-                            pickup: pickup,
-                            destination: destination,
-                            seats: seatsOffering,
-                        });
+                        if (pickup === 'Set pickup location' || destination === 'Set drop-off location') {
+                            Alert.alert('Locations Required', 'Please set both your pickup and drop-off locations first.');
+                            return;
+                        }
+                        setShowSeatModal(true);
                     }}
                     activeOpacity={0.85}
                 >
-                    <Text style={styles.createBtnText}>Create car pool ride</Text>
+                    <Text style={styles.createBtnText}>Set Seat Prices & Create</Text>
                     <FontAwesomeIcon icon={faArrowRight} size={16} color="#000000" />
                 </TouchableOpacity>
             </View>
+
+            {/* Seat Preference Pricing Modal */}
+            <DriverSeatPreferenceModal
+                visible={showSeatModal}
+                onClose={() => setShowSeatModal(false)}
+                basePrice={totalFarePerSeat}
+                initialTotalSeats={seatsOffering}
+                maxCapacity={4}
+                initialPricing={seatPricing}
+                initialDistribution={seatDistribution}
+                onConfirm={(data) => {
+                    setSeatPricing(data.pricing);
+                    setSeatDistribution(data.distribution);
+                    setSeatsOffering(data.totalSeats);
+                    (navigation as any).navigate('DriverCarChooseRoute', {
+                        pickup: pickup,
+                        destination: destination,
+                        seats: data.totalSeats,
+                        pricePerSeat: data.pricing.middle,
+                        seatPricing: data.pricing,
+                        seatDistribution: data.distribution,
+                        estimatedEarnings: data.totalEarnings,
+                    });
+                }}
+            />
 
             <CalendarModal
                 visible={showCalendar}
                 onClose={() => setShowCalendar(false)}
                 onSelectDate={(date) => setSelectedDate(date)}
-                selectedDate="25-Jul-2026"
+                selectedDate={selectedDate}
                 disablePastDates={true}
             />
 
@@ -385,7 +463,7 @@ const DriverCarCreateRideScreen = () => {
                 visible={showTimePicker}
                 onClose={() => setShowTimePicker(false)}
                 onSelectTime={(time) => setSelectedTime(time)}
-                selectedTime="09:15 AM"
+                selectedTime={selectedTime}
             />
         </SafeAreaView>
     );
@@ -815,6 +893,72 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: '#000000',
         marginRight: 8,
+    },
+    seatPricingCard: {
+        backgroundColor: '#1E293B',
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#334155',
+    },
+    seatPricingHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    seatPricingTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    seatPricingTitleText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#FFFFFF',
+        letterSpacing: 0.5,
+    },
+    seatPricingCustomizeText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#10B981',
+    },
+    rowPricingBadges: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 8,
+    },
+    rowBadge: {
+        flex: 1,
+        backgroundColor: '#0F172A',
+        borderRadius: 12,
+        padding: 10,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#334155',
+    },
+    rowBadgeLabel: {
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#94A3B8',
+        marginBottom: 2,
+    },
+    rowBadgePrice: {
+        fontSize: 15,
+        fontWeight: '900',
+        color: '#2DD4BF',
+    },
+    rowBadgeSeats: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#CBD5E1',
+        marginTop: 2,
+    },
+    seatPricingSubNote: {
+        fontSize: 11,
+        color: '#94A3B8',
+        textAlign: 'center',
+        marginTop: 4,
     },
 });
 

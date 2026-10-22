@@ -219,9 +219,7 @@ export const login = async (req, res) => {
 
     // Generate 6-digit OTP
     const cleanUserPhone = (user.phone || '').replace(/\D/g, '').slice(-10);
-    const TEST_NUMBERS = ['8439993033', '8439993031'];
-    const isTestNumber = TEST_NUMBERS.includes(cleanUserPhone);
-    const bypassOtp = isTestNumber || process.env.BYPASS_OTP === 'true';
+    const bypassOtp = process.env.BYPASS_OTP === 'true';
     const otp = bypassOtp ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
@@ -229,9 +227,9 @@ export const login = async (req, res) => {
     user.otpExpires = otpExpires;
     await user.save();
 
-    // ─── BYPASS: Skip SMS/WhatsApp for test number or BYPASS_OTP mode ───
+    // ─── BYPASS: Skip SMS/WhatsApp only if BYPASS_OTP mode is explicitly enabled ───
     if (bypassOtp) {
-      console.log(`[OTP BYPASS] Test number ${cleanUserPhone} — OTP is 123456, skipping SMS/WhatsApp gateway.`);
+      console.log(`[OTP BYPASS] BYPASS_OTP enabled for ${cleanUserPhone} — OTP is 123456, skipping SMS/WhatsApp gateway.`);
       return sendSuccess(res, 200, 'OTP sent to your phone', {
         otpRequired: true,
         phone: user.phone,
@@ -302,8 +300,7 @@ export const verifyOTP = async (req, res) => {
     });
     console.log("user found for OTP verification:", user?.phone);
 
-    const isTestNumber = cleanPhone === '8439993033';
-    const isTestOtpValid = isTestNumber && otp === '123456';
+    const isTestOtpValid = process.env.BYPASS_OTP === 'true' && otp === '123456';
 
     if (!user || (!isTestOtpValid && (user.otp !== otp || user.otpExpires < new Date()))) {
       return sendError(res, 401, 'Invalid or expired OTP');
@@ -444,10 +441,8 @@ export const sendOTP = async (req, res) => {
       });
     }
 
-    // Generate OTP — always 123456 for test number or BYPASS_OTP mode
-    const TEST_NUMBERS = ['8439993033', '8439993031'];
-    const isTestNumber = TEST_NUMBERS.includes(cleanPhone);
-    const bypassOtp = isTestNumber || process.env.BYPASS_OTP === 'true';
+    // Generate OTP
+    const bypassOtp = process.env.BYPASS_OTP === 'true';
     const otp = bypassOtp ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
@@ -457,7 +452,7 @@ export const sendOTP = async (req, res) => {
 
     console.log(`[OTP GENERATED] OTP for ${cleanPhone}: ${otp} (Channel: ${channel}) | Bypass: ${bypassOtp}`);
 
-    // ─── BYPASS: Skip SMS/WhatsApp for test number or BYPASS_OTP mode ───
+    // ─── BYPASS: Skip SMS/WhatsApp only if BYPASS_OTP mode is explicitly enabled ───
     if (bypassOtp) {
       console.log(`[OTP BYPASS] Skipping ${channel.toUpperCase()} gateway for ${cleanPhone}. Use OTP: 123456`);
       return sendSuccess(res, 200, `OTP sent via ${channel.toUpperCase()}`, {

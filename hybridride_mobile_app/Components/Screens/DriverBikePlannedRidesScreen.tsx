@@ -21,6 +21,7 @@ import {
     faChevronRight,
     faCheck,
     faPlus,
+    faMinus,
     faTimes,
     faInfoCircle,
 } from '@fortawesome/free-solid-svg-icons';

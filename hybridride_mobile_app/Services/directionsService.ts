@@ -1,5 +1,6 @@
 import { PermissionsAndroid, Platform, Alert } from 'react-native';
 import GetLocation from 'react-native-get-location';
+import Geolocation from '@react-native-community/geolocation';
 import { promptForEnableLocationIfNeeded } from 'react-native-android-location-enabler';
 import { GOOGLE_MAPS_API_KEY } from '../Config/maps';
 
@@ -12,6 +13,46 @@ export interface RouteOption {
     durationMin: number;
     coordinates: { latitude: number; longitude: number }[];
 }
+
+/**
+ * Reverse geocode latitude and longitude into a readable address string.
+ */
+export const getAddressFromCoords = async (latitude: number, longitude: number): Promise<string> => {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`;
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.status === 'OK' && data.results && data.results.length > 0) {
+            return data.results[0].formatted_address;
+        }
+    } catch (e) {
+        console.error('Google Reverse Geocoding error:', e);
+    }
+
+    // Fallback: Free reverse geocoding via OpenStreetMap Nominatim
+    try {
+        const osmUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
+        const osmRes = await fetch(osmUrl, {
+            headers: { 'User-Agent': 'SanchariApp/1.0' }
+        });
+        const osmData = await osmRes.json();
+        if (osmData && osmData.display_name) {
+            const parts: string[] = [];
+            const addr = osmData.address || {};
+            const localArea = addr.road || addr.neighbourhood || addr.suburb;
+            if (localArea) parts.push(localArea);
+            if (addr.suburb && !parts.includes(addr.suburb)) parts.push(addr.suburb);
+            if (addr.city || addr.town || addr.village) parts.push(addr.city || addr.town || addr.village);
+            if (addr.state) parts.push(addr.state);
+
+            return parts.length > 0 ? parts.join(', ') : osmData.display_name.split(',').slice(0, 3).join(',').trim();
+        }
+    } catch (osmErr) {
+        console.error('OSM Geocoding fallback error:', osmErr);
+    }
+
+    return "Current Location";
+};
 
 // Robust Current Location Detector with Permission Check & Reverse Geocoding
 export const getCurrentLocationAddress = async (): Promise<{ address: string; latitude: number; longitude: number } | null> => {
@@ -36,17 +77,32 @@ export const getCurrentLocationAddress = async (): Promise<{ address: string; la
             }
         }
 
-        let location;
+        let location: { latitude: number; longitude: number } | null = null;
         try {
             location = await GetLocation.getCurrentPosition({
                 enableHighAccuracy: true,
-                timeout: 10000,
+                timeout: 8000,
             });
         } catch {
-            location = await GetLocation.getCurrentPosition({
-                enableHighAccuracy: false,
-                timeout: 15000,
-            });
+            try {
+                location = await GetLocation.getCurrentPosition({
+                    enableHighAccuracy: false,
+                    timeout: 10000,
+                });
+            } catch {
+                // Fallback to community geolocation
+                try {
+                    location = await new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
+                        Geolocation.getCurrentPosition(
+                            (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+                            () => resolve(null),
+                            { enableHighAccuracy: false, timeout: 10000, maximumAge: 30000 }
+                        );
+                    });
+                } catch {
+                    location = null;
+                }
+            }
         }
 
         if (!location || typeof location.latitude !== 'number' || typeof location.longitude !== 'number') {
@@ -54,43 +110,8 @@ export const getCurrentLocationAddress = async (): Promise<{ address: string; la
         }
 
         const { latitude, longitude } = location;
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`;
-        try {
-            const res = await fetch(url);
-            const data = await res.json();
-
-            if (data.status === 'OK' && data.results && data.results.length > 0) {
-                const address = data.results[0].formatted_address;
-                return { address, latitude, longitude };
-            }
-        } catch (e) {
-            console.error('Google Reverse Geocoding error:', e);
-        }
-
-        // Fallback: Free reverse geocoding via OpenStreetMap Nominatim
-        try {
-            const osmUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
-            const osmRes = await fetch(osmUrl, {
-                headers: { 'User-Agent': 'SanchariApp/1.0' }
-            });
-            const osmData = await osmRes.json();
-            if (osmData && osmData.display_name) {
-                const parts: string[] = [];
-                const addr = osmData.address || {};
-                const localArea = addr.road || addr.neighbourhood || addr.suburb;
-                if (localArea) parts.push(localArea);
-                if (addr.suburb && !parts.includes(addr.suburb)) parts.push(addr.suburb);
-                if (addr.city || addr.town || addr.village) parts.push(addr.city || addr.town || addr.village);
-                if (addr.state) parts.push(addr.state);
-
-                const cleanAddress = parts.length > 0 ? parts.join(', ') : osmData.display_name.split(',').slice(0, 3).join(',').trim();
-                return { address: cleanAddress, latitude, longitude };
-            }
-        } catch (osmErr) {
-            console.error('OSM Geocoding fallback error:', osmErr);
-        }
-
-        return { address: "Current Location", latitude, longitude };
+        const address = await getAddressFromCoords(latitude, longitude);
+        return { address, latitude, longitude };
     } catch (err: any) {
         console.error('getCurrentLocationAddress Error:', err);
         return null;

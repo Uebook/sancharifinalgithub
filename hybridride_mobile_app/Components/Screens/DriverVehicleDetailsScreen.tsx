@@ -55,6 +55,47 @@ const DriverVehicleDetailsScreen = () => {
         loadInitialDraft();
     }, []);
 
+    // Auto-save vehicle details draft on any navigation exit (gesture swipe back, hardware back, etc.)
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', async () => {
+            const vehicleDetails = {
+                make,
+                model,
+                year,
+                plateNumber,
+                color,
+                type: vehicleType,
+                fuelType,
+                seatingCapacity: vehicleType === 'BIKE' ? 1 : Number(seatingCapacity),
+                bootSpace: vehicleType === 'BIKE' ? '0' : bootSpace
+            };
+
+            const draft = await driverOnboardingStorage.getDraft();
+            const updatedUserData = {
+                ...(draft?.userData || {}),
+                ...userData,
+                vehicle: vehicleDetails
+            };
+
+            let currentDocs = Array.from(new Set([
+                ...(draft?.uploadedDocuments || []),
+                ...existingDocs
+            ]));
+            const isComplete = !!(make && model && year && plateNumber && color);
+            if (isComplete && !currentDocs.includes('Vehicle Details')) {
+                currentDocs.push('Vehicle Details');
+            }
+
+            await driverOnboardingStorage.saveDraft({
+                userData: updatedUserData,
+                vehicleType,
+                capturedDocs: { ...(draft?.capturedDocs || {}), ...capturedDocs },
+                uploadedDocuments: currentDocs
+            });
+        });
+        return unsubscribe;
+    }, [navigation, make, model, year, plateNumber, color, vehicleType, fuelType, seatingCapacity, bootSpace, userData, existingDocs, capturedDocs]);
+
     const handleBack = React.useCallback(async () => {
         const vehicleDetails = {
             make,
@@ -68,28 +109,38 @@ const DriverVehicleDetailsScreen = () => {
             bootSpace: vehicleType === 'BIKE' ? '0' : bootSpace
         };
 
+        const draft = await driverOnboardingStorage.getDraft();
         const updatedUserData = {
+            ...(draft?.userData || {}),
             ...userData,
             vehicle: vehicleDetails
         };
 
-        let currentDocs = [...existingDocs];
+        let currentDocs = Array.from(new Set([
+            ...(draft?.uploadedDocuments || []),
+            ...existingDocs
+        ]));
         const isComplete = !!(make && model && year && plateNumber && color);
         if (isComplete && !currentDocs.includes('Vehicle Details')) {
             currentDocs.push('Vehicle Details');
         }
 
+        const mergedDocs = {
+            ...(draft?.capturedDocs || {}),
+            ...capturedDocs
+        };
+
         await driverOnboardingStorage.saveDraft({
             userData: updatedUserData,
             vehicleType,
-            capturedDocs,
+            capturedDocs: mergedDocs,
             uploadedDocuments: currentDocs
         });
 
         (navigation as any).navigate(targetScreen, {
             userData: updatedUserData,
             vehicleType,
-            capturedDocs,
+            capturedDocs: mergedDocs,
             updatedDocList: currentDocs,
             fromProfile: (route.params as any)?.fromProfile
         });
@@ -125,17 +176,28 @@ const DriverVehicleDetailsScreen = () => {
             bootSpace: vehicleType === 'BIKE' ? '0' : bootSpace
         };
 
+        const draft = await driverOnboardingStorage.getDraft();
         const updatedUserData = {
+            ...(draft?.userData || {}),
             ...userData,
             vehicle: vehicleDetails
         };
 
-        const updatedList = Array.from(new Set([...existingDocs, 'Vehicle Details']));
+        const updatedList = Array.from(new Set([
+            ...(draft?.uploadedDocuments || []),
+            ...existingDocs, 
+            'Vehicle Details'
+        ]));
+
+        const mergedDocs = {
+            ...(draft?.capturedDocs || {}),
+            ...capturedDocs
+        };
 
         await driverOnboardingStorage.saveDraft({
             userData: updatedUserData,
             vehicleType,
-            capturedDocs,
+            capturedDocs: mergedDocs,
             uploadedDocuments: updatedList
         });
 
@@ -146,7 +208,7 @@ const DriverVehicleDetailsScreen = () => {
             updatedDocList: updatedList,
             vehicleType,
             userData: updatedUserData,
-            capturedDocs: capturedDocs, // Pass back the docs
+            capturedDocs: mergedDocs,
             fromProfile: (route.params as any)?.fromProfile
         });
     };

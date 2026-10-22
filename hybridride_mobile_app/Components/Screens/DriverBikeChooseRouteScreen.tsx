@@ -18,7 +18,7 @@ import {
     faMotorcycle,
     faRoute
 } from '@fortawesome/free-solid-svg-icons';
-import { fetchGoogleRoutes, getCoordsFromAddress, RouteOption } from '../../Services/directionsService';
+import { fetchGoogleRoutes, getCoordsFromAddress, getCurrentLocationAddress, RouteOption } from '../../Services/directionsService';
 import poolService from '../../Services/poolService';
 
 const DriverBikeChooseRouteScreen = () => {

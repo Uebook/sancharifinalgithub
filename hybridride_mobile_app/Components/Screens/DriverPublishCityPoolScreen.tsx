@@ -89,7 +89,7 @@ const DriverPublishCityPoolScreen = () => {
         if (value > 0) setter(value - 1);
     };
 
-    const handleGetCurrentLocation = async () => {
+    const fetchCurrentLocation = async () => {
         try {
             const res = await getCurrentLocationAddress();
             if (res) {
@@ -102,6 +102,7 @@ const DriverPublishCityPoolScreen = () => {
             Alert.alert("Error", "Could not determine location. Please check your GPS settings.");
         }
     };
+    const handleGetCurrentLocation = fetchCurrentLocation;
 
     return (
         <SafeAreaView style={styles.container}>

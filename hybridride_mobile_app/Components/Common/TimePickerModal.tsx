@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     StyleSheet,
     Text,
@@ -17,24 +16,52 @@ interface TimePickerModalProps {
     selectedTime?: string; // Format: "hh:mm AM/PM"
 }
 
+const ITEM_HEIGHT = 44;
+
 const TimePickerModal = ({ visible, onClose, onSelectTime, selectedTime }: TimePickerModalProps) => {
     const [selectedHour, setSelectedHour] = useState('12');
     const [selectedMinute, setSelectedMinute] = useState('00');
     const [selectedPeriod, setSelectedPeriod] = useState('AM');
 
-    useEffect(() => {
-        if (selectedTime && selectedTime.includes(':')) {
-            const [timePart, period] = selectedTime.split(' ');
-            const [hour, minute] = timePart.split(':');
-            if (hour) setSelectedHour(hour);
-            if (minute) setSelectedMinute(minute);
-            if (period) setSelectedPeriod(period);
-        }
-    }, [selectedTime, visible]);
+    const hourScrollRef = useRef<ScrollView>(null);
+    const minuteScrollRef = useRef<ScrollView>(null);
 
     const hours = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
     const minutes = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
     const periods = ['AM', 'PM'];
+
+    useEffect(() => {
+        if (selectedTime && selectedTime.includes(':')) {
+            const [timePart, period] = selectedTime.split(' ');
+            const [hour, minute] = (timePart || '').split(':');
+            if (hour) setSelectedHour(hour.padStart(2, '0'));
+            if (minute) setSelectedMinute(minute.padStart(2, '0'));
+            if (period) setSelectedPeriod(period.toUpperCase());
+        }
+    }, [selectedTime, visible]);
+
+    // Auto-scroll to selected hour and minute when modal opens
+    useEffect(() => {
+        if (visible) {
+            const timer = setTimeout(() => {
+                const hourIndex = hours.indexOf(selectedHour);
+                if (hourIndex > 0 && hourScrollRef.current) {
+                    hourScrollRef.current.scrollTo({
+                        y: Math.max(0, (hourIndex - 1) * ITEM_HEIGHT),
+                        animated: true,
+                    });
+                }
+                const minuteIndex = minutes.indexOf(selectedMinute);
+                if (minuteIndex > 0 && minuteScrollRef.current) {
+                    minuteScrollRef.current.scrollTo({
+                        y: Math.max(0, (minuteIndex - 1) * ITEM_HEIGHT),
+                        animated: true,
+                    });
+                }
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [visible]);
 
     const handleConfirm = () => {
         onSelectTime(`${selectedHour}:${selectedMinute} ${selectedPeriod}`);
@@ -42,75 +69,122 @@ const TimePickerModal = ({ visible, onClose, onSelectTime, selectedTime }: TimeP
     };
 
     return (
-        <Modal transparent visible={visible} animationType="fade">
+        <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
             <Pressable style={styles.modalOverlay} onPress={onClose}>
                 <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
                     <Text style={styles.headerTitle}>Select Time</Text>
 
+                    {/* Live Preview Display */}
+                    <View style={styles.timePreviewCard}>
+                        <Text style={styles.timePreviewText}>
+                            {selectedHour}:{selectedMinute}{' '}
+                            <Text style={styles.timePreviewPeriod}>{selectedPeriod}</Text>
+                        </Text>
+                    </View>
+
                     <View style={styles.pickerContainer}>
                         {/* Hours Column */}
                         <View style={styles.columnContainer}>
-                            <Text style={styles.columnLabel}>Hour</Text>
-                            <ScrollView style={styles.scrollColumn} showsVerticalScrollIndicator={false}>
-                                {hours.map((hour) => (
-                                    <TouchableOpacity
-                                        key={hour}
-                                        style={[styles.item, selectedHour === hour && styles.selectedItem]}
-                                        onPress={() => setSelectedHour(hour)}
-                                    >
-                                        <Text style={[styles.itemText, selectedHour === hour && styles.selectedItemText]}>
-                                            {hour}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
+                            <Text style={styles.columnLabel}>HOUR</Text>
+                            <ScrollView
+                                ref={hourScrollRef}
+                                style={styles.scrollColumn}
+                                contentContainerStyle={styles.scrollContent}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                {hours.map((hour) => {
+                                    const isSelected = selectedHour === hour;
+                                    return (
+                                        <TouchableOpacity
+                                            key={hour}
+                                            style={[styles.item, isSelected && styles.selectedItem]}
+                                            onPress={() => setSelectedHour(hour)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.itemText,
+                                                    isSelected && styles.selectedItemText,
+                                                ]}
+                                            >
+                                                {hour}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
                             </ScrollView>
                         </View>
 
                         {/* Separator */}
-                        <Text style={styles.separator}>:</Text>
+                        <View style={styles.separatorContainer}>
+                            <Text style={styles.separator}>:</Text>
+                        </View>
 
                         {/* Minutes Column */}
                         <View style={styles.columnContainer}>
-                            <Text style={styles.columnLabel}>Minute</Text>
-                            <ScrollView style={styles.scrollColumn} showsVerticalScrollIndicator={false}>
-                                {minutes.map((minute) => (
-                                    <TouchableOpacity
-                                        key={minute}
-                                        style={[styles.item, selectedMinute === minute && styles.selectedItem]}
-                                        onPress={() => setSelectedMinute(minute)}
-                                    >
-                                        <Text style={[styles.itemText, selectedMinute === minute && styles.selectedItemText]}>
-                                            {minute}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
+                            <Text style={styles.columnLabel}>MINUTE</Text>
+                            <ScrollView
+                                ref={minuteScrollRef}
+                                style={styles.scrollColumn}
+                                contentContainerStyle={styles.scrollContent}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                {minutes.map((minute) => {
+                                    const isSelected = selectedMinute === minute;
+                                    return (
+                                        <TouchableOpacity
+                                            key={minute}
+                                            style={[styles.item, isSelected && styles.selectedItem]}
+                                            onPress={() => setSelectedMinute(minute)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.itemText,
+                                                    isSelected && styles.selectedItemText,
+                                                ]}
+                                            >
+                                                {minute}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
                             </ScrollView>
                         </View>
 
                         {/* Period Column */}
-                        <View style={[styles.columnContainer, { flex: 0.6 }]}>
+                        <View style={[styles.columnContainer, { flex: 0.85 }]}>
                             <Text style={styles.columnLabel}>AM/PM</Text>
                             <View style={styles.periodContainer}>
-                                {periods.map((period) => (
-                                    <TouchableOpacity
-                                        key={period}
-                                        style={[styles.periodItem, selectedPeriod === period && styles.selectedPeriodItem]}
-                                        onPress={() => setSelectedPeriod(period)}
-                                    >
-                                        <Text style={[styles.periodText, selectedPeriod === period && styles.selectedPeriodText]}>
-                                            {period}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
+                                {periods.map((period) => {
+                                    const isSelected = selectedPeriod === period;
+                                    return (
+                                        <TouchableOpacity
+                                            key={period}
+                                            style={[styles.periodItem, isSelected && styles.selectedPeriodItem]}
+                                            onPress={() => setSelectedPeriod(period)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.periodText,
+                                                    isSelected && styles.selectedPeriodText,
+                                                ]}
+                                            >
+                                                {period}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
                             </View>
                         </View>
                     </View>
 
                     <View style={styles.footer}>
-                        <TouchableOpacity onPress={onClose} style={styles.button}>
+                        <TouchableOpacity onPress={onClose} style={styles.cancelButton} activeOpacity={0.7}>
                             <Text style={styles.cancelText}>Cancel</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={handleConfirm} style={styles.button}>
+                        <TouchableOpacity onPress={handleConfirm} style={styles.confirmButton} activeOpacity={0.85}>
                             <Text style={styles.confirmText}>OK</Text>
                         </TouchableOpacity>
                     </View>
@@ -123,34 +197,56 @@ const TimePickerModal = ({ visible, onClose, onSelectTime, selectedTime }: TimeP
 const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     modalContent: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 20,
-        padding: 24,
-        width: '85%',
-        maxHeight: '60%',
+        borderRadius: 24,
+        padding: 22,
+        width: '88%',
+        maxWidth: 380,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.25,
-        shadowRadius: 10,
-        elevation: 10,
+        shadowRadius: 16,
+        elevation: 12,
     },
     headerTitle: {
         fontSize: 18,
         fontWeight: '800',
-        color: '#111827',
+        color: '#0F172A',
         textAlign: 'center',
-        marginBottom: 20,
+        marginBottom: 12,
+        letterSpacing: 0.3,
+    },
+    timePreviewCard: {
+        backgroundColor: '#F0FDFA',
+        borderWidth: 1,
+        borderColor: '#CCFBF1',
+        borderRadius: 14,
+        paddingVertical: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    timePreviewText: {
+        fontSize: 26,
+        fontWeight: '900',
+        color: '#0D9488',
+        letterSpacing: 1,
+    },
+    timePreviewPeriod: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#0F766E',
     },
     pickerContainer: {
         flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-        height: 200,
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        height: 210,
     },
     columnContainer: {
         flex: 1,
@@ -158,81 +254,125 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     columnLabel: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#9CA3AF',
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#64748B',
         marginBottom: 8,
-        textTransform: 'uppercase',
+        letterSpacing: 0.8,
     },
     scrollColumn: {
         width: '100%',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+    },
+    scrollContent: {
+        alignItems: 'center',
+        paddingVertical: 6,
     },
     item: {
-        paddingVertical: 10,
+        width: 52,
+        height: ITEM_HEIGHT,
         alignItems: 'center',
-        borderRadius: 8,
+        justifyContent: 'center',
+        borderRadius: 10,
+        marginVertical: 2,
     },
     selectedItem: {
-        backgroundColor: '#E0F2F1',
+        backgroundColor: '#0D9488',
+        shadowColor: '#0D9488',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
     },
     itemText: {
-        fontSize: 16,
-        color: '#374151',
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1E293B',
+        textAlign: 'center',
     },
     selectedItemText: {
-        color: '#0D9488',
-        fontWeight: '800',
-        fontSize: 18,
+        color: '#FFFFFF',
+        fontWeight: '900',
+        fontSize: 20,
+    },
+    separatorContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+        paddingTop: 18,
     },
     separator: {
         fontSize: 24,
-        fontWeight: '800',
-        color: '#374151',
-        marginTop: 40,
-        marginHorizontal: 10,
+        fontWeight: '900',
+        color: '#0F172A',
     },
     periodContainer: {
-        marginTop: 30,
+        width: '100%',
+        paddingTop: 24,
+        alignItems: 'center',
     },
     periodItem: {
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        marginBottom: 8,
-        backgroundColor: '#F3F4F6',
+        width: '100%',
+        paddingVertical: 12,
+        borderRadius: 12,
+        marginBottom: 10,
+        backgroundColor: '#F1F5F9',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     selectedPeriodItem: {
-        backgroundColor: '#2DD4BF',
+        backgroundColor: '#0D9488',
+        shadowColor: '#0D9488',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
     },
     periodText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#6B7280',
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#475569',
     },
     selectedPeriodText: {
         color: '#FFFFFF',
-        fontWeight: '800',
+        fontWeight: '900',
     },
     footer: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
-        marginTop: 24,
+        alignItems: 'center',
+        marginTop: 18,
         borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
-        paddingTop: 16,
+        borderTopColor: '#F1F5F9',
+        paddingTop: 14,
+        gap: 12,
     },
-    button: {
-        marginLeft: 24,
+    cancelButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 10,
     },
     cancelText: {
         fontSize: 14,
-        fontWeight: '600',
-        color: '#6B7280',
+        fontWeight: '700',
+        color: '#64748B',
+    },
+    confirmButton: {
+        backgroundColor: '#0D9488',
+        paddingVertical: 10,
+        paddingHorizontal: 22,
+        borderRadius: 10,
+        shadowColor: '#0D9488',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 2,
     },
     confirmText: {
         fontSize: 14,
         fontWeight: '800',
-        color: '#2DD4BF',
+        color: '#FFFFFF',
     },
 });
 

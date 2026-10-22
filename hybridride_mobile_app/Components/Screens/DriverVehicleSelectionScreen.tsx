@@ -28,6 +28,9 @@ const DriverVehicleSelectionScreen = ({ route }: any) => {
     const navigation = useNavigation();
     const { userData, capturedDocs, updatedDocList, vehicleType: passedVehicleType } = route.params || {};
 
+    const [capturedDocuments, setCapturedDocuments] = useState<Record<string, string>>(capturedDocs || {});
+    const [docList, setDocList] = useState<string[]>(updatedDocList || []);
+
     const [selectedVehicle, setSelectedVehicle] = useState<string | null>(
         passedVehicleType || userData?.vehicle?.type || null
     );
@@ -39,12 +42,30 @@ const DriverVehicleSelectionScreen = ({ route }: any) => {
                 if (!selectedVehicle && draft.vehicleType) {
                     setSelectedVehicle(draft.vehicleType);
                 }
+                if (draft.capturedDocs) {
+                    setCapturedDocuments((prev) => ({ ...draft.capturedDocs, ...prev }));
+                }
+                if (draft.uploadedDocuments) {
+                    setDocList((prev) => Array.from(new Set([...draft.uploadedDocuments!, ...prev])));
+                }
             }
         };
         loadInitialDraft();
     }, []);
 
     const handleBack = React.useCallback(async () => {
+        const draft = await driverOnboardingStorage.getDraft();
+        const mergedDocs = {
+            ...(draft?.capturedDocs || {}),
+            ...capturedDocuments,
+            ...(capturedDocs || {})
+        };
+        const mergedList = Array.from(new Set([
+            ...(draft?.uploadedDocuments || []),
+            ...docList,
+            ...(updatedDocList || [])
+        ]));
+
         await driverOnboardingStorage.saveDraft({
             vehicleType: selectedVehicle || undefined,
             userData: {
@@ -54,8 +75,8 @@ const DriverVehicleSelectionScreen = ({ route }: any) => {
                     type: selectedVehicle || userData?.vehicle?.type || 'CAR'
                 }
             },
-            capturedDocs,
-            uploadedDocuments: updatedDocList
+            capturedDocs: mergedDocs,
+            uploadedDocuments: mergedList
         });
 
         (navigation as any).navigate('ProfileSetup', {
@@ -63,7 +84,7 @@ const DriverVehicleSelectionScreen = ({ route }: any) => {
             userData: userData
         });
         return true;
-    }, [navigation, userData, selectedVehicle, capturedDocs, updatedDocList]);
+    }, [navigation, userData, selectedVehicle, capturedDocuments, docList, capturedDocs, updatedDocList]);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -100,9 +121,23 @@ const DriverVehicleSelectionScreen = ({ route }: any) => {
     const handleContinue = async () => {
         if (!selectedVehicle) return;
 
+        const draft = await driverOnboardingStorage.getDraft();
+        const mergedDocs = {
+            ...(draft?.capturedDocs || {}),
+            ...capturedDocuments,
+            ...(capturedDocs || {})
+        };
+        const mergedList = Array.from(new Set([
+            ...(draft?.uploadedDocuments || []),
+            ...docList,
+            ...(updatedDocList || [])
+        ]));
+
         const updatedUserData = {
+            ...(draft?.userData || {}),
             ...userData,
             vehicle: {
+                ...(draft?.userData?.vehicle || {}),
                 ...userData?.vehicle,
                 type: selectedVehicle
             }
@@ -111,15 +146,15 @@ const DriverVehicleSelectionScreen = ({ route }: any) => {
         await driverOnboardingStorage.saveDraft({
             vehicleType: selectedVehicle,
             userData: updatedUserData,
-            capturedDocs,
-            uploadedDocuments: updatedDocList
+            capturedDocs: mergedDocs,
+            uploadedDocuments: mergedList
         });
 
         (navigation as any).navigate('DriverRegistration', {
             vehicleType: selectedVehicle,
             userData: updatedUserData,
-            capturedDocs,
-            updatedDocList
+            capturedDocs: mergedDocs,
+            updatedDocList: mergedList
         });
     };
 

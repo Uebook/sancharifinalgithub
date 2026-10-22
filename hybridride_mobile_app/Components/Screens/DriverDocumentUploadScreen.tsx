@@ -57,17 +57,13 @@ const DriverDocumentUploadScreen = () => {
     useEffect(() => {
         const loadInitialDraft = async () => {
             const draft = await driverOnboardingStorage.getDraft();
-            if (draft?.capturedDocs) {
-                if (!frontImage && draft.capturedDocs[frontDocTypeKey]) {
-                    setFrontImage(draft.capturedDocs[frontDocTypeKey]);
-                }
-                if (!backImage && draft.capturedDocs[backDocTypeKey]) {
-                    setBackImage(draft.capturedDocs[backDocTypeKey]);
-                }
-            }
+            const initialFront = capturedDocs[frontDocTypeKey] || draft?.capturedDocs?.[frontDocTypeKey] || (user?.driverDetails as any)?.documents?.[frontDocTypeKey] || null;
+            const initialBack = capturedDocs[backDocTypeKey] || draft?.capturedDocs?.[backDocTypeKey] || (user?.driverDetails as any)?.documents?.[backDocTypeKey] || null;
+            if (initialFront) setFrontImage(initialFront);
+            if (initialBack) setBackImage(initialBack);
         };
         loadInitialDraft();
-    }, [frontDocTypeKey, backDocTypeKey]);
+    }, [frontDocTypeKey, backDocTypeKey, capturedDocs, user]);
 
     const isBothSidesRequired = documentName.toLowerCase().includes('aadhaar') || documentName.toLowerCase().includes('license');
     const isSubmitEnabled = isBothSidesRequired ? (!!frontImage && !!backImage) : !!frontImage;
@@ -81,34 +77,37 @@ const DriverDocumentUploadScreen = () => {
         if (result.assets && result.assets.length > 0) {
             const uri = result.assets[0].uri;
             if (uri) {
-                let updatedFront = frontImage;
-                let updatedBack = backImage;
+                const updatedFront = side === 'FRONT' ? uri : frontImage;
+                const updatedBack = side === 'BACK' ? uri : backImage;
 
                 if (side === 'FRONT') {
                     setFrontImage(uri);
-                    updatedFront = uri;
                 } else {
                     setBackImage(uri);
-                    updatedBack = uri;
                 }
 
                 // Auto-save immediately to AsyncStorage
+                const draft = await driverOnboardingStorage.getDraft();
                 const newDocs: Record<string, string> = {};
                 if (updatedFront) newDocs[frontDocTypeKey] = updatedFront;
-                if (updatedBack && isBothSidesRequired) newDocs[backDocTypeKey] = updatedBack;
+                if (updatedBack) newDocs[backDocTypeKey] = updatedBack;
 
                 const finalCapturedDocs = {
+                    ...(draft?.capturedDocs || {}),
                     ...capturedDocs,
                     ...newDocs
                 };
 
                 const isComplete = isBothSidesRequired ? (!!updatedFront && !!updatedBack) : !!updatedFront;
-                let currentDocs = [...existingDocs];
+                let currentDocs = Array.from(new Set([
+                    ...(draft?.uploadedDocuments || []),
+                    ...existingDocs
+                ]));
                 if (isComplete && !currentDocs.includes(documentName)) {
                     currentDocs.push(documentName);
                 }
 
-                driverOnboardingStorage.saveDraft({
+                await driverOnboardingStorage.saveDraft({
                     capturedDocs: finalCapturedDocs,
                     uploadedDocuments: currentDocs,
                     userData,
@@ -118,18 +117,57 @@ const DriverDocumentUploadScreen = () => {
         }
     };
 
+    // Auto-save draft on any navigation exit (gesture swipe back, hardware back, etc.)
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', async () => {
+            if (frontImage || backImage) {
+                const draft = await driverOnboardingStorage.getDraft();
+                const newDocs: Record<string, string> = {};
+                if (frontImage) newDocs[frontDocTypeKey] = frontImage;
+                if (backImage) newDocs[backDocTypeKey] = backImage;
+
+                const finalCapturedDocs = {
+                    ...(draft?.capturedDocs || {}),
+                    ...capturedDocs,
+                    ...newDocs
+                };
+
+                const isComplete = isBothSidesRequired ? (!!frontImage && !!backImage) : !!frontImage;
+                let currentDocs = Array.from(new Set([
+                    ...(draft?.uploadedDocuments || []),
+                    ...existingDocs
+                ]));
+                if (isComplete && !currentDocs.includes(documentName)) {
+                    currentDocs.push(documentName);
+                }
+
+                await driverOnboardingStorage.saveDraft({
+                    capturedDocs: finalCapturedDocs,
+                    uploadedDocuments: currentDocs,
+                    userData,
+                    vehicleType
+                });
+            }
+        });
+        return unsubscribe;
+    }, [navigation, frontImage, backImage, frontDocTypeKey, backDocTypeKey, isBothSidesRequired, capturedDocs, existingDocs, documentName, userData, vehicleType]);
+
     const handleBack = React.useCallback(async () => {
+        const draft = await driverOnboardingStorage.getDraft();
         const newDocs: Record<string, string> = {};
         if (frontImage) newDocs[frontDocTypeKey] = frontImage;
-        if (backImage && isBothSidesRequired) newDocs[backDocTypeKey] = backImage;
+        if (backImage) newDocs[backDocTypeKey] = backImage;
 
-        const existingCapturedDocs = (route.params as any)?.capturedDocs || {};
         const finalCapturedDocs = {
-            ...existingCapturedDocs,
+            ...(draft?.capturedDocs || {}),
+            ...capturedDocs,
             ...newDocs
         };
 
-        let currentDocs = [...existingDocs];
+        let currentDocs = Array.from(new Set([
+            ...(draft?.uploadedDocuments || []),
+            ...existingDocs
+        ]));
         const isNowComplete = isBothSidesRequired ? (!!frontImage && !!backImage) : !!frontImage;
         if (isNowComplete && !currentDocs.includes(documentName)) {
             currentDocs.push(documentName);
@@ -150,7 +188,7 @@ const DriverDocumentUploadScreen = () => {
             fromProfile: (route.params as any)?.fromProfile
         });
         return true;
-    }, [navigation, frontImage, backImage, frontDocTypeKey, backDocTypeKey, isBothSidesRequired, route.params, existingDocs, documentName, userData, vehicleType, targetScreen]);
+    }, [navigation, frontImage, backImage, frontDocTypeKey, backDocTypeKey, isBothSidesRequired, capturedDocs, existingDocs, documentName, userData, vehicleType, targetScreen, route.params]);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -166,23 +204,26 @@ const DriverDocumentUploadScreen = () => {
     const handleSubmit = async () => {
         if (!frontImage) return;
 
+        const draft = await driverOnboardingStorage.getDraft();
         const newDocs: Record<string, string> = {
             [frontDocTypeKey]: frontImage,
         };
 
-        if (backImage && isBothSidesRequired) {
+        if (backImage) {
             newDocs[backDocTypeKey] = backImage;
         }
 
-        // Merge with existing docs passed from previous screen
-        const params = route.params as any || {};
-        const existingCapturedDocs = params.capturedDocs || {};
         const finalCapturedDocs = {
-            ...existingCapturedDocs,
+            ...(draft?.capturedDocs || {}),
+            ...capturedDocs,
             ...newDocs
         };
 
-        const updatedList = Array.from(new Set([...existingDocs, documentName]));
+        const updatedList = Array.from(new Set([
+            ...(draft?.uploadedDocuments || []),
+            ...existingDocs,
+            documentName
+        ]));
 
         // If user is already authenticated/existing, upload directly to server!
         if (user) {

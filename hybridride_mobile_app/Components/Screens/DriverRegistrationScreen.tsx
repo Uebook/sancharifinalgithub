@@ -60,8 +60,8 @@ const DriverRegistrationScreen = () => {
         phone: user.phone,
         vehicle: user.driverDetails?.vehicle || {},
     } : {});
-    const initialCapturedDocs = params.capturedDocs || user?.driverDetails?.documents || {};
-    const initialUploadedDocs = params.updatedDocList || Object.keys(user?.driverDetails?.documents || {});
+    const initialCapturedDocs = params.capturedDocs || (user?.driverDetails as any)?.documents || {};
+    const initialUploadedDocs = params.updatedDocList || Object.keys((user?.driverDetails as any)?.documents || {});
 
     const [vehicleType, setVehicleType] = useState<string>(initialVehicleType);
     // State to hold merged user data across navigation
@@ -86,8 +86,8 @@ const DriverRegistrationScreen = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Load initial draft from persistent storage on mount
-    useEffect(() => {
-        const loadInitialDraft = async () => {
+    const syncFromDraft = React.useCallback(async () => {
+        try {
             const draft = await driverOnboardingStorage.getDraft();
             if (draft) {
                 if (draft.vehicleType && !params.vehicleType) {
@@ -102,32 +102,45 @@ const DriverRegistrationScreen = () => {
                 }
                 if (draft.capturedDocs) {
                     setDocumentUris((prev: any) => ({
-                        ...draft.capturedDocs,
+                        ...((user?.driverDetails as any)?.documents || {}),
                         ...prev,
+                        ...draft.capturedDocs,
                         ...(params.capturedDocs || {})
                     }));
                 }
                 if (draft.uploadedDocuments) {
-                    setUploadedDocuments((prev: any) => {
-                        const merged = Array.from(new Set([
-                            ...draft.uploadedDocuments!,
-                            ...prev,
-                            ...(params.updatedDocList || []),
-                            ...(params.completedDocument ? [params.completedDocument] : [])
-                        ]));
-                        return merged;
-                    });
+                    setUploadedDocuments((prev: any) => Array.from(new Set([
+                        ...draft.uploadedDocuments!,
+                        ...prev,
+                        ...(params.updatedDocList || []),
+                        ...(params.completedDocument ? [params.completedDocument] : [])
+                    ])));
                 }
             }
-        };
-        loadInitialDraft();
-    }, []);
+        } catch (e) {
+            console.error('Error syncing driver onboarding draft:', e);
+        }
+    }, [params, user]);
+
+    useEffect(() => {
+        syncFromDraft();
+    }, [syncFromDraft]);
 
     const handleBack = React.useCallback(async () => {
+        const draft = await driverOnboardingStorage.getDraft();
+        const mergedDocs = {
+            ...(draft?.capturedDocs || {}),
+            ...documentUris
+        };
+        const mergedList = Array.from(new Set([
+            ...(draft?.uploadedDocuments || []),
+            ...uploadedDocuments
+        ]));
+
         await driverOnboardingStorage.saveDraft({
             userData: mergedUserData,
-            capturedDocs: documentUris,
-            uploadedDocuments,
+            capturedDocs: mergedDocs,
+            uploadedDocuments: mergedList,
             vehicleType
         });
 
@@ -139,8 +152,8 @@ const DriverRegistrationScreen = () => {
             (navigation as any).navigate('DriverVehicleSelection', {
                 userData: mergedUserData,
                 vehicleType,
-                capturedDocs: documentUris,
-                updatedDocList: uploadedDocuments
+                capturedDocs: mergedDocs,
+                updatedDocList: mergedList
             });
         }
         return true;
@@ -148,13 +161,14 @@ const DriverRegistrationScreen = () => {
 
     useFocusEffect(
         React.useCallback(() => {
+            syncFromDraft();
             const onBackPress = () => {
                 handleBack();
                 return true;
             };
             const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
             return () => subscription.remove();
-        }, [handleBack])
+        }, [handleBack, syncFromDraft])
     );
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
@@ -208,15 +222,25 @@ const DriverRegistrationScreen = () => {
     }, [params.completedDocument, params.updatedDocList, params.capturedDocs, params.userData, params.vehicleType]);
 
     const checkIsCompleted = (title: string) => {
-        if (uploadedDocuments.includes(title)) return true;
-        if (title === 'Aadhaar Card') return !!(documentUris.aadharFront);
-        if (title === 'PAN Card') return !!documentUris.panCard;
-        if (title === 'Driving License') return !!(documentUris.licenseFront);
-        if (title.includes('RC')) return !!documentUris.rc;
-        if (title.includes('Insurance')) return !!documentUris.insurance;
-        if (title.includes('Permit')) return !!documentUris.permit;
-        if (title.includes('Fitness')) return !!documentUris.fitness;
+        if (title === 'Aadhaar Card') {
+            return (!!documentUris.aadharFront && !!documentUris.aadharBack) || uploadedDocuments.includes(title);
+        }
+        if (title === 'Driving License') {
+            return (!!documentUris.licenseFront && !!documentUris.licenseBack) || uploadedDocuments.includes(title);
+        }
+        if (title === 'PAN Card') return !!documentUris.panCard || uploadedDocuments.includes(title);
+        if (title.includes('RC')) return !!documentUris.rc || uploadedDocuments.includes(title) || uploadedDocuments.includes(rcLabel);
+        if (title.includes('Insurance')) return !!documentUris.insurance || uploadedDocuments.includes(title) || uploadedDocuments.includes(insuranceLabel);
+        if (title.includes('Permit')) return !!documentUris.permit || uploadedDocuments.includes(title);
+        if (title.includes('Fitness')) return !!documentUris.fitness || uploadedDocuments.includes(title);
         if (title === 'Vehicle Details') return !!(mergedUserData?.vehicle?.make && mergedUserData?.vehicle?.plateNumber);
+        return uploadedDocuments.includes(title);
+    };
+
+    const isDocPartiallyCompleted = (title: string) => {
+        if (checkIsCompleted(title)) return false;
+        if (title === 'Aadhaar Card') return !!(documentUris.aadharFront || documentUris.aadharBack);
+        if (title === 'Driving License') return !!(documentUris.licenseFront || documentUris.licenseBack);
         return false;
     };
 
@@ -377,25 +401,80 @@ const DriverRegistrationScreen = () => {
         }
     };
 
+    const navigateToUpload = (docName: string, desc: string) => {
+        driverOnboardingStorage.saveDraft({
+            userData: mergedUserData,
+            capturedDocs: documentUris,
+            uploadedDocuments,
+            vehicleType
+        });
+        (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
+            documentName: docName,
+            description: desc,
+            existingDocs: uploadedDocuments,
+            vehicleType,
+            userData: mergedUserData,
+            capturedDocs: documentUris,
+            fromProfile
+        });
+    };
+
+    const navigateToVehicleDetails = () => {
+        driverOnboardingStorage.saveDraft({
+            userData: mergedUserData,
+            capturedDocs: documentUris,
+            uploadedDocuments,
+            vehicleType
+        });
+        (navigation as any).navigate(isReupload ? 'ReuploadVehicleDetails' : 'DriverVehicleDetails', {
+            existingDocs: uploadedDocuments,
+            vehicleType,
+            userData: mergedUserData,
+            capturedDocs: documentUris,
+            fromProfile
+        });
+    };
+
     const renderStep = (title: string, subtitle: string, icon: any, isLocked: boolean = false, isOptional: boolean = false, onPress?: () => void) => {
         const isCompleted = checkIsCompleted(title);
+        const isPartial = isDocPartiallyCompleted(title);
+
+        let statusSubtitle = subtitle;
+        if (isCompleted) {
+            statusSubtitle = "Uploaded & Saved";
+        } else if (isPartial) {
+            statusSubtitle = "Front photo saved · Back pending";
+        }
 
         return (
             <TouchableOpacity
-                style={[styles.stepCard, isLocked && styles.stepCardLocked, isCompleted && styles.stepCardCompleted]}
+                style={[
+                    styles.stepCard, 
+                    isLocked && styles.stepCardLocked, 
+                    isCompleted && styles.stepCardCompleted,
+                    isPartial && { borderColor: '#F59E0B', borderWidth: 1 }
+                ]}
                 disabled={isLocked}
                 onPress={onPress}
             >
-                <View style={[styles.iconBox, isLocked ? styles.iconBoxLocked : (isCompleted ? styles.iconBoxCompleted : styles.iconBoxActive)]}>
-                    <FontAwesomeIcon icon={isCompleted ? faCheckCircle : (isLocked ? faLock : icon)} size={20} color={isLocked ? "#9CA3AF" : (isCompleted ? "#10B981" : "#374151")} />
+                <View style={[
+                    styles.iconBox, 
+                    isLocked ? styles.iconBoxLocked : (isCompleted ? styles.iconBoxCompleted : (isPartial ? { backgroundColor: 'rgba(245, 158, 11, 0.15)' } : styles.iconBoxActive))
+                ]}>
+                    <FontAwesomeIcon 
+                        icon={isCompleted ? faCheckCircle : (isLocked ? faLock : (isPartial ? faFileLines : icon))} 
+                        size={20} 
+                        color={isLocked ? "#9CA3AF" : (isCompleted ? "#10B981" : (isPartial ? "#F59E0B" : "#374151"))} 
+                    />
                 </View>
                 <View style={styles.stepTextContainer}>
                     <View style={styles.titleRow}>
                         <Text style={[styles.stepTitle, isLocked && styles.textLocked, isCompleted && styles.textCompleted]}>{title}</Text>
-                        {isOptional && !isCompleted && <View style={styles.optionalBadge}><Text style={styles.optionalText}>OPTIONAL</Text></View>}
+                        {isOptional && !isCompleted && !isPartial && <View style={styles.optionalBadge}><Text style={styles.optionalText}>OPTIONAL</Text></View>}
+                        {isPartial && <View style={[styles.optionalBadge, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}><Text style={[styles.optionalText, { color: '#F59E0B' }]}>PARTIAL</Text></View>}
                     </View>
-                    <Text style={[styles.stepSubtitle, isLocked && styles.textLocked]}>
-                        {isCompleted ? "Verified & Uploaded" : subtitle}
+                    <Text style={[styles.stepSubtitle, isLocked && styles.textLocked, isPartial && { color: '#F59E0B' }]}>
+                        {statusSubtitle}
                     </Text>
                 </View>
                 <View style={styles.actionIcon}>
@@ -405,7 +484,7 @@ const DriverRegistrationScreen = () => {
                         isLocked ? (
                             <View style={styles.lockedCircle} />
                         ) : (
-                            <FontAwesomeIcon icon={faChevronRight} size={14} color="#9CA3AF" />
+                            <FontAwesomeIcon icon={faChevronRight} size={14} color={isPartial ? "#F59E0B" : "#9CA3AF"} />
                         )
                     )}
                 </View>
@@ -454,83 +533,37 @@ const DriverRegistrationScreen = () => {
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
                 <Text style={styles.sectionHeader}>IDENTITY VERIFICATION</Text>
-                {renderStep("Aadhaar Card", "Government Identity (Mandatory)", faIdCard, false, false, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
-                    documentName: 'Aadhaar Card',
-                    description: 'Upload a clear photo of your Aadhaar card (Front & Back).',
-                    existingDocs: uploadedDocuments,
-                    vehicleType,
-                    userData: mergedUserData,
-                    capturedDocs: documentUris,
-                    fromProfile
-                }))}
-                {renderStep("PAN Card", "For Tax Compliance (Optional)", faCreditCard, !isIdentityVerified, true, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
-                    documentName: 'PAN Card',
-                    description: 'Upload a clear photo of your PAN card (Front).',
-                    existingDocs: uploadedDocuments,
-                    vehicleType,
-                    userData: mergedUserData,
-                    capturedDocs: documentUris,
-                    fromProfile
-                }))}
+                {renderStep("Aadhaar Card", "Government Identity (Mandatory)", faIdCard, false, false, () => 
+                    navigateToUpload('Aadhaar Card', 'Upload a clear photo of your Aadhaar card (Front & Back).')
+                )}
+                {renderStep("PAN Card", "For Tax Compliance (Optional)", faCreditCard, !isIdentityVerified, true, () => 
+                    navigateToUpload('PAN Card', 'Upload a clear photo of your PAN card (Front).')
+                )}
 
                 <Text style={styles.sectionHeader}>VEHICLE VERIFICATION</Text>
-                {renderStep("Driving License", "Valid government DL (Mandatory)", faFileLines, !isIdentityVerified, false, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
-                    documentName: 'Driving License',
-                    description: 'Upload a clear photo of your Driving License (Front & Back).',
-                    existingDocs: uploadedDocuments,
-                    vehicleType,
-                    userData: mergedUserData,
-                    capturedDocs: documentUris,
-                    fromProfile
-                }))}
+                {renderStep("Driving License", "Valid government DL (Mandatory)", faFileLines, !isIdentityVerified, false, () => 
+                    navigateToUpload('Driving License', 'Upload a clear photo of your Driving License (Front & Back).')
+                )}
 
-                {renderStep(rcLabel, "Registration Certificate (Mandatory)", faFileLines, !isIdentityVerified, false, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
-                    documentName: rcLabel,
-                    description: `Upload a clear photo of your ${vehicleType} Registration Certificate.`,
-                    existingDocs: uploadedDocuments,
-                    vehicleType,
-                    userData: mergedUserData,
-                    capturedDocs: documentUris,
-                    fromProfile
-                }))}
+                {renderStep(rcLabel, "Registration Certificate (Mandatory)", faFileLines, !isIdentityVerified, false, () => 
+                    navigateToUpload(rcLabel, `Upload a clear photo of your ${vehicleType} Registration Certificate.`)
+                )}
 
-                {renderStep(insuranceLabel, "Commercial policy (Mandatory)", faFileLines, !isIdentityVerified, false, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
-                    documentName: insuranceLabel,
-                    description: `Upload ${vehicleType} Insurance Policy.`,
-                    existingDocs: uploadedDocuments,
-                    vehicleType,
-                    userData: mergedUserData,
-                    capturedDocs: documentUris,
-                    fromProfile
-                }))}
+                {renderStep(insuranceLabel, "Commercial policy (Mandatory)", faFileLines, !isIdentityVerified, false, () => 
+                    navigateToUpload(insuranceLabel, `Upload ${vehicleType} Insurance Policy.`)
+                )}
 
-                {renderStep(permitLabel, "State transport permit (Optional)", faFileLines, !isIdentityVerified, true, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
-                    documentName: permitLabel,
-                    description: `Upload ${vehicleType} Permit.`,
-                    existingDocs: uploadedDocuments,
-                    vehicleType,
-                    userData: mergedUserData,
-                    capturedDocs: documentUris,
-                    fromProfile
-                }))}
+                {renderStep(permitLabel, "State transport permit (Optional)", faFileLines, !isIdentityVerified, true, () => 
+                    navigateToUpload(permitLabel, `Upload ${vehicleType} Permit.`)
+                )}
 
-                {renderStep(fitnessLabel, "Vehicle fitness cert (Optional)", faFileLines, !isIdentityVerified, true, () => (navigation as any).navigate(isReupload ? 'ReuploadDocumentUpload' : 'DriverDocumentUpload', {
-                    documentName: fitnessLabel,
-                    description: `Upload ${vehicleType} Fitness Certificate.`,
-                    existingDocs: uploadedDocuments,
-                    vehicleType,
-                    userData: mergedUserData,
-                    capturedDocs: documentUris,
-                    fromProfile
-                }))}
+                {renderStep(fitnessLabel, "Vehicle fitness cert (Optional)", faFileLines, !isIdentityVerified, true, () => 
+                    navigateToUpload(fitnessLabel, `Upload ${vehicleType} Fitness Certificate.`)
+                )}
 
-                {renderStep("Vehicle Details", "Make, Model & Plate (Mandatory)", faCar, !isIdentityVerified, false, () => (navigation as any).navigate(isReupload ? 'ReuploadVehicleDetails' : 'DriverVehicleDetails', {
-                    existingDocs: uploadedDocuments,
-                    vehicleType,
-                    userData: mergedUserData, // Pass merged data
-                    capturedDocs: documentUris,
-                    fromProfile
-                }))}
+                {renderStep("Vehicle Details", "Make, Model & Plate (Mandatory)", faCar, !isIdentityVerified, false, () => 
+                    navigateToVehicleDetails()
+                )}
 
                 <View style={{ height: 100 }} />
             </ScrollView>
