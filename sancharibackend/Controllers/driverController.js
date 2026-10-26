@@ -235,7 +235,7 @@ export const getEarnings = async (req, res) => {
 
     const [bookings, pools] = await Promise.all([
       Booking.find({ driver: driverId, status: 'completed' }),
-      Pool.find({ host: driverId })
+      Ride.find({ host: driverId })
     ]);
 
     let today = 0;

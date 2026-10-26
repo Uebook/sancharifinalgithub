@@ -221,13 +221,15 @@ const UnifiedLoginScreen = () => {
                                 <FontAwesomeIcon icon={faGoogle} size={24} color="#EA4335" />
                             </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={styles.socialIconCircle}
-                                onPress={handleAppleLogin}
-                                activeOpacity={0.8}
-                            >
-                                <FontAwesomeIcon icon={faApple} size={26} color="#000000" />
-                            </TouchableOpacity>
+                            {Platform.OS === 'ios' && (
+                                <TouchableOpacity
+                                    style={styles.socialIconCircle}
+                                    onPress={handleAppleLogin}
+                                    activeOpacity={0.8}
+                                >
+                                    <FontAwesomeIcon icon={faApple} size={26} color="#000000" />
+                                </TouchableOpacity>
+                            )}
                         </View>
 
                         {/* Don't have an account? Sign Up */}

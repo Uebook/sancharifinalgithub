@@ -85,14 +85,19 @@ export const sendPersonalizedSMS = async (recipients, templateId = null, message
                 .replace(/\{#num#\}/g, otpVal);
         }
 
-        const phoneNumbers = recipients.map(r => String(r.number || r.phone || '').replace(/\D/g, '').slice(-10)).filter(Boolean);
+        const formattedNumbers = recipients.map(r => ({
+            number: String(r.number || r.phone || cleanNum).replace(/\D/g, '').slice(-10),
+            alp: String(r.alp || r.name || nameVal || 'User'),
+            num: String(r.num || r.otp || otpVal || '')
+        })).filter(r => r.number.length === 10);
 
         const payload = {
             senderid: activeSenderId,
-            message: formattedMessage,
+            template_id: activeTemplateId,
+            message: message || "Dear {#alp#}, Welcome to Sanchari App! Your OTP is {#num#}, valid for 5 minutes. Do not share it. Sanchari never asks for your OTP. - Shivakshini GSPL",
             unicode: 0,
-            personalized: 0,
-            numbers: phoneNumbers.length > 0 ? phoneNumbers : [cleanNum],
+            personalized: 1,
+            numbers: formattedNumbers.length > 0 ? formattedNumbers : [{ number: cleanNum, alp: nameVal, num: otpVal }],
         };
 
         const headers = {
