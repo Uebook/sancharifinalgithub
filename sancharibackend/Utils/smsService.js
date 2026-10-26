@@ -95,7 +95,6 @@ export const sendPersonalizedSMS = async (recipients, templateId = null, message
 
         const payload = {
             senderid: activeSenderId,
-            template_id: activeTemplateId,
             message: formattedMessage,
             unicode: 0,
             personalized: 0,
