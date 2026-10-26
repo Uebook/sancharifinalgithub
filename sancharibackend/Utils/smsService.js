@@ -91,13 +91,15 @@ export const sendPersonalizedSMS = async (recipients, templateId = null, message
             num: String(r.num || r.otp || otpVal || '')
         })).filter(r => r.number.length === 10);
 
+        const phoneNumbers = formattedNumbers.map(r => r.number);
+
         const payload = {
             senderid: activeSenderId,
             template_id: activeTemplateId,
-            message: message || "Dear {#alp#}, Welcome to Sanchari App! Your OTP is {#num#}, valid for 5 minutes. Do not share it. Sanchari never asks for your OTP. - Shivakshini GSPL",
+            message: formattedMessage,
             unicode: 0,
-            personalized: 1,
-            numbers: formattedNumbers.length > 0 ? formattedNumbers : [{ number: cleanNum, alp: nameVal, num: otpVal }],
+            personalized: 0,
+            numbers: phoneNumbers.length > 0 ? phoneNumbers : [cleanNum],
         };
 
         const headers = {
